@@ -2,6 +2,12 @@
 
 Versions are integers: **1**, **2**, **3**, and so on. Each new release increments by one.
 
+## [7]
+
+- Input and output screens say which jacks you are naming
+- Empty boxes show Input 1 / Zone 1 as placeholder text
+- Each output is grouped as Zone 1, Zone 2, … with name and room together
+
 ## [6]
 
 - Setup is three screens: IP and hardware, then inputs, then outputs
@@ -37,7 +43,8 @@ Versions are integers: **1**, **2**, **3**, and so on. Each new release incremen
 - Amp↔switch source carry-through
 - Zone/source names, polling, bass/treble, `send_command` / `set_route` / `turn_off_all`
 
-[6]: https://github.com/heatvent/ha-c4-audio/compare/v5...HEAD
+[7]: https://github.com/heatvent/ha-c4-audio/compare/v6...HEAD
+[6]: https://github.com/heatvent/ha-c4-audio/compare/v5...v6
 [5]: https://github.com/heatvent/ha-c4-audio/compare/v4...v5
 [4]: https://github.com/heatvent/ha-c4-audio/compare/v3...v4
 [3]: https://github.com/heatvent/ha-c4-audio/compare/v2...v3

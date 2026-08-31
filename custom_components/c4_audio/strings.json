@@ -19,8 +19,8 @@
         }
       },
       "inputs": {
-        "title": "Inputs",
-        "description": "Physical input jack numbers are the labels. Leave a name empty to skip that input; you can add it later under Configure.",
+        "title": "Name inputs",
+        "description": "You are naming the physical INPUT jacks. Empty skips that input. Gray text is the jack number.",
         "data": {
           "input_1_name": "Input 1",
           "input_2_name": "Input 2",
@@ -41,41 +41,155 @@
         }
       },
       "outputs": {
-        "title": "Outputs",
-        "description": "Physical output jack numbers are the labels. Leave a name empty to skip that output. Room is the Home Assistant area. You can add or change these later under Configure.",
+        "title": "Name outputs",
+        "description": "You are naming the physical OUTPUT jacks (zones). Empty name skips that output. Pick a room for each named output.",
         "data": {
-          "zone_1_name": "Output 1",
-          "zone_1_area": "Output 1 room",
-          "zone_2_name": "Output 2",
-          "zone_2_area": "Output 2 room",
-          "zone_3_name": "Output 3",
-          "zone_3_area": "Output 3 room",
-          "zone_4_name": "Output 4",
-          "zone_4_area": "Output 4 room",
-          "zone_5_name": "Output 5",
-          "zone_5_area": "Output 5 room",
-          "zone_6_name": "Output 6",
-          "zone_6_area": "Output 6 room",
-          "zone_7_name": "Output 7",
-          "zone_7_area": "Output 7 room",
-          "zone_8_name": "Output 8",
-          "zone_8_area": "Output 8 room",
-          "zone_9_name": "Output 9",
-          "zone_9_area": "Output 9 room",
-          "zone_10_name": "Output 10",
-          "zone_10_area": "Output 10 room",
-          "zone_11_name": "Output 11",
-          "zone_11_area": "Output 11 room",
-          "zone_12_name": "Output 12",
-          "zone_12_area": "Output 12 room",
-          "zone_13_name": "Output 13",
-          "zone_13_area": "Output 13 room",
-          "zone_14_name": "Output 14",
-          "zone_14_area": "Output 14 room",
-          "zone_15_name": "Output 15",
-          "zone_15_area": "Output 15 room",
-          "zone_16_name": "Output 16",
-          "zone_16_area": "Output 16 room"
+          "zone_1_name": "Zone 1",
+          "zone_1_area": "Room",
+          "zone_2_name": "Zone 2",
+          "zone_2_area": "Room",
+          "zone_3_name": "Zone 3",
+          "zone_3_area": "Room",
+          "zone_4_name": "Zone 4",
+          "zone_4_area": "Room",
+          "zone_5_name": "Zone 5",
+          "zone_5_area": "Room",
+          "zone_6_name": "Zone 6",
+          "zone_6_area": "Room",
+          "zone_7_name": "Zone 7",
+          "zone_7_area": "Room",
+          "zone_8_name": "Zone 8",
+          "zone_8_area": "Room",
+          "zone_9_name": "Zone 9",
+          "zone_9_area": "Room",
+          "zone_10_name": "Zone 10",
+          "zone_10_area": "Room",
+          "zone_11_name": "Zone 11",
+          "zone_11_area": "Room",
+          "zone_12_name": "Zone 12",
+          "zone_12_area": "Room",
+          "zone_13_name": "Zone 13",
+          "zone_13_area": "Room",
+          "zone_14_name": "Zone 14",
+          "zone_14_area": "Room",
+          "zone_15_name": "Zone 15",
+          "zone_15_area": "Room",
+          "zone_16_name": "Zone 16",
+          "zone_16_area": "Room"
+        },
+        "sections": {
+          "zone_1": {
+            "name": "Zone 1",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_2": {
+            "name": "Zone 2",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_3": {
+            "name": "Zone 3",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_4": {
+            "name": "Zone 4",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_5": {
+            "name": "Zone 5",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_6": {
+            "name": "Zone 6",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_7": {
+            "name": "Zone 7",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_8": {
+            "name": "Zone 8",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_9": {
+            "name": "Zone 9",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_10": {
+            "name": "Zone 10",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_11": {
+            "name": "Zone 11",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_12": {
+            "name": "Zone 12",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_13": {
+            "name": "Zone 13",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_14": {
+            "name": "Zone 14",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_15": {
+            "name": "Zone 15",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_16": {
+            "name": "Zone 16",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          }
         }
       }
     },
@@ -99,8 +213,8 @@
         }
       },
       "inputs": {
-        "title": "Inputs",
-        "description": "Leave a name empty to skip that input.",
+        "title": "Name inputs",
+        "description": "You are naming INPUT jacks. Empty skips that input.",
         "data": {
           "input_1_name": "Input 1",
           "input_2_name": "Input 2",
@@ -121,41 +235,155 @@
         }
       },
       "outputs": {
-        "title": "Outputs",
-        "description": "Leave a name empty to skip that output. Room is the Home Assistant area.",
+        "title": "Name outputs",
+        "description": "You are naming OUTPUT jacks (zones). Empty name skips that output.",
         "data": {
-          "zone_1_name": "Output 1",
-          "zone_1_area": "Output 1 room",
-          "zone_2_name": "Output 2",
-          "zone_2_area": "Output 2 room",
-          "zone_3_name": "Output 3",
-          "zone_3_area": "Output 3 room",
-          "zone_4_name": "Output 4",
-          "zone_4_area": "Output 4 room",
-          "zone_5_name": "Output 5",
-          "zone_5_area": "Output 5 room",
-          "zone_6_name": "Output 6",
-          "zone_6_area": "Output 6 room",
-          "zone_7_name": "Output 7",
-          "zone_7_area": "Output 7 room",
-          "zone_8_name": "Output 8",
-          "zone_8_area": "Output 8 room",
-          "zone_9_name": "Output 9",
-          "zone_9_area": "Output 9 room",
-          "zone_10_name": "Output 10",
-          "zone_10_area": "Output 10 room",
-          "zone_11_name": "Output 11",
-          "zone_11_area": "Output 11 room",
-          "zone_12_name": "Output 12",
-          "zone_12_area": "Output 12 room",
-          "zone_13_name": "Output 13",
-          "zone_13_area": "Output 13 room",
-          "zone_14_name": "Output 14",
-          "zone_14_area": "Output 14 room",
-          "zone_15_name": "Output 15",
-          "zone_15_area": "Output 15 room",
-          "zone_16_name": "Output 16",
-          "zone_16_area": "Output 16 room"
+          "zone_1_name": "Zone 1",
+          "zone_1_area": "Room",
+          "zone_2_name": "Zone 2",
+          "zone_2_area": "Room",
+          "zone_3_name": "Zone 3",
+          "zone_3_area": "Room",
+          "zone_4_name": "Zone 4",
+          "zone_4_area": "Room",
+          "zone_5_name": "Zone 5",
+          "zone_5_area": "Room",
+          "zone_6_name": "Zone 6",
+          "zone_6_area": "Room",
+          "zone_7_name": "Zone 7",
+          "zone_7_area": "Room",
+          "zone_8_name": "Zone 8",
+          "zone_8_area": "Room",
+          "zone_9_name": "Zone 9",
+          "zone_9_area": "Room",
+          "zone_10_name": "Zone 10",
+          "zone_10_area": "Room",
+          "zone_11_name": "Zone 11",
+          "zone_11_area": "Room",
+          "zone_12_name": "Zone 12",
+          "zone_12_area": "Room",
+          "zone_13_name": "Zone 13",
+          "zone_13_area": "Room",
+          "zone_14_name": "Zone 14",
+          "zone_14_area": "Room",
+          "zone_15_name": "Zone 15",
+          "zone_15_area": "Room",
+          "zone_16_name": "Zone 16",
+          "zone_16_area": "Room"
+        },
+        "sections": {
+          "zone_1": {
+            "name": "Zone 1",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_2": {
+            "name": "Zone 2",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_3": {
+            "name": "Zone 3",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_4": {
+            "name": "Zone 4",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_5": {
+            "name": "Zone 5",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_6": {
+            "name": "Zone 6",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_7": {
+            "name": "Zone 7",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_8": {
+            "name": "Zone 8",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_9": {
+            "name": "Zone 9",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_10": {
+            "name": "Zone 10",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_11": {
+            "name": "Zone 11",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_12": {
+            "name": "Zone 12",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_13": {
+            "name": "Zone 13",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_14": {
+            "name": "Zone 14",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_15": {
+            "name": "Zone 15",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          },
+          "zone_16": {
+            "name": "Zone 16",
+            "data": {
+              "name": "Name",
+              "area": "Room"
+            }
+          }
         }
       },
       "settings": {

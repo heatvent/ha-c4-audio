@@ -10,6 +10,11 @@ from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 
+try:
+    from homeassistant.data_entry_flow import section
+except ImportError:  # Home Assistant < 2024.6
+    section = None  # type: ignore[misc, assignment]
+
 from .const import (
     CONF_ENABLE_EQ,
     CONF_IDENT,
@@ -79,10 +84,29 @@ def _zone_schema(count: int, stored: dict[int, dict]) -> dict[Any, Any]:
     fields: dict[Any, Any] = {}
     for index in range(1, count + 1):
         cfg = stored.get(index, {})
-        fields[vol.Optional(_zone_name_key(index), default=cfg.get("name") or "")] = (
-            selector.TextSelector()
-        )
+        name = cfg.get("name") or ""
         area = cfg.get("area_id")
+        name_selector = selector.TextSelector(
+            selector.TextSelectorConfig(placeholder=f"Zone {index}")
+        )
+        if section is not None:
+            inner: dict[Any, Any] = {}
+            if name:
+                inner[vol.Optional("name", default=name)] = name_selector
+            else:
+                inner[vol.Optional("name")] = name_selector
+            if area:
+                inner[vol.Optional("area", default=area)] = selector.AreaSelector()
+            else:
+                inner[vol.Optional("area")] = selector.AreaSelector()
+            fields[vol.Required(f"zone_{index}")] = section(
+                vol.Schema(inner), {"collapsed": False}
+            )
+            continue
+        if name:
+            fields[vol.Optional(_zone_name_key(index), default=name)] = name_selector
+        else:
+            fields[vol.Optional(_zone_name_key(index))] = name_selector
         if area:
             fields[vol.Optional(_zone_area_key(index), default=area)] = selector.AreaSelector()
         else:
@@ -94,7 +118,13 @@ def _input_schema(count: int, stored: list[str]) -> dict[Any, Any]:
     fields: dict[Any, Any] = {}
     for index in range(1, count + 1):
         default = stored[index - 1] if index - 1 < len(stored) else ""
-        fields[vol.Optional(_input_name_key(index), default=default)] = selector.TextSelector()
+        box = selector.TextSelector(
+            selector.TextSelectorConfig(placeholder=f"Input {index}")
+        )
+        if default:
+            fields[vol.Optional(_input_name_key(index), default=default)] = box
+        else:
+            fields[vol.Optional(_input_name_key(index))] = box
     return fields
 
 
@@ -102,8 +132,13 @@ def _extract_zones(user_input: dict[str, Any], count: int) -> dict[str, Any]:
     packed = dict(user_input)
     zones: dict[str, dict[str, str | None]] = {}
     for index in range(1, count + 1):
-        name = str(packed.pop(_zone_name_key(index), "") or "").strip()
-        area = packed.pop(_zone_area_key(index), None) or None
+        block = packed.pop(f"zone_{index}", None)
+        if isinstance(block, dict):
+            name = str(block.get("name") or "").strip()
+            area = block.get("area") or None
+        else:
+            name = str(packed.pop(_zone_name_key(index), "") or "").strip()
+            area = packed.pop(_zone_area_key(index), None) or None
         zones[str(index)] = {"name": name, "area_id": area}
     packed[CONF_ZONES] = zones
     packed.pop(CONF_ZONE_NAMES, None)

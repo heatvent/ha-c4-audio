@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import logging
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT
@@ -44,6 +45,8 @@ from .const import (
 from .discovery import async_sddp_search, identity_from_info
 from .udp_client import async_probe_identity
 
+_LOGGER = logging.getLogger(__name__)
+
 MANUAL_ENTRY = "manual"
 
 
@@ -80,15 +83,17 @@ def _stored_input_names(data: dict[str, Any], options: dict[str, Any] | None, co
     return names
 
 
+def _text_box(*, prefix: str) -> selector.TextSelector:
+    return selector.TextSelector(selector.TextSelectorConfig(prefix=prefix))
+
+
 def _zone_schema(count: int, stored: dict[int, dict]) -> dict[Any, Any]:
     fields: dict[Any, Any] = {}
     for index in range(1, count + 1):
         cfg = stored.get(index, {})
         name = cfg.get("name") or ""
         area = cfg.get("area_id")
-        name_selector = selector.TextSelector(
-            selector.TextSelectorConfig(placeholder=f"Zone {index}")
-        )
+        name_selector = _text_box(prefix=f"Zone {index}")
         if section is not None:
             inner: dict[Any, Any] = {}
             if name:
@@ -118,9 +123,7 @@ def _input_schema(count: int, stored: list[str]) -> dict[Any, Any]:
     fields: dict[Any, Any] = {}
     for index in range(1, count + 1):
         default = stored[index - 1] if index - 1 < len(stored) else ""
-        box = selector.TextSelector(
-            selector.TextSelectorConfig(placeholder=f"Input {index}")
-        )
+        box = _text_box(prefix=f"Input {index}")
         if default:
             fields[vol.Optional(_input_name_key(index), default=default)] = box
         else:
@@ -171,14 +174,24 @@ def _apply_setup_defaults(data: dict[str, Any]) -> dict[str, Any]:
 
 def _model_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     defaults = defaults or {}
+    options = [
+        selector.SelectOptionDict(value=key, label=info["name"])
+        for key, info in SETUP_MODELS.items()
+    ]
     return vol.Schema(
         {
             vol.Required(CONF_NAME, default=defaults.get(CONF_NAME, "Control4 Amp")): str,
             vol.Required(CONF_HOST, default=defaults.get(CONF_HOST, "")): str,
-            vol.Required(CONF_PORT, default=defaults.get(CONF_PORT, DEFAULT_PORT)): int,
+            vol.Required(CONF_PORT, default=defaults.get(CONF_PORT, DEFAULT_PORT)): vol.All(
+                vol.Coerce(int), vol.Range(min=1, max=65535)
+            ),
             vol.Required(
                 CONF_MODEL, default=defaults.get(CONF_MODEL, MODEL_AMP16)
-            ): vol.In({key: info["name"] for key, info in SETUP_MODELS.items()}),
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=options, mode=selector.SelectSelectorMode.DROPDOWN
+                )
+            ),
         }
     )
 
@@ -195,7 +208,11 @@ class C4AudioConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
         if user_input is None:
-            self._discovered = await async_sddp_search()
+            try:
+                self._discovered = await async_sddp_search()
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("SDDP search failed")
+                self._discovered = []
             if self._discovered:
                 return await self.async_step_discover()
             return self.async_show_form(step_id="user", data_schema=_model_schema())
@@ -274,9 +291,19 @@ class C4AudioConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def _async_validate_manual(
         self, user_input: dict[str, Any], errors: dict[str, str]
     ):
-        host = user_input[CONF_HOST].strip()
-        port = int(user_input[CONF_PORT])
-        identity = await async_probe_identity(host, port, DEFAULT_UDP_TIMEOUT)
+        host = str(user_input.get(CONF_HOST, "")).strip()
+        try:
+            port = int(user_input[CONF_PORT])
+        except (KeyError, TypeError, ValueError):
+            errors["base"] = "cannot_connect"
+            return self.async_show_form(
+                step_id="user", data_schema=_model_schema(user_input), errors=errors
+            )
+        try:
+            identity = await async_probe_identity(host, port, DEFAULT_UDP_TIMEOUT)
+        except Exception:  # noqa: BLE001 — surface as cannot_connect, details in log
+            _LOGGER.exception("UDP probe failed for %s:%s", host, port)
+            identity = None
         if identity is None:
             errors["base"] = "cannot_connect"
             return self.async_show_form(
@@ -288,16 +315,19 @@ class C4AudioConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         model = user_input.get(CONF_MODEL) or identity.model_id or MODEL_AMP16
         if identity.model_id:
             model = identity.model_id
+        if model not in MODELS:
+            model = MODEL_AMP16
         self._data = {
             **user_input,
             CONF_HOST: host,
+            CONF_PORT: port,
             CONF_MODEL: model,
             CONF_IDENT: unique,
         }
         return await self.async_step_inputs()
 
     async def async_step_inputs(self, user_input: dict[str, Any] | None = None):
-        model = MODELS[self._data[CONF_MODEL]]
+        model = MODELS.get(self._data.get(CONF_MODEL), MODELS[MODEL_AMP16])
         if user_input is not None:
             self._data.update(_extract_inputs(user_input, model["inputs"]))
             return await self.async_step_outputs()
@@ -308,7 +338,7 @@ class C4AudioConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_outputs(self, user_input: dict[str, Any] | None = None):
-        model = MODELS[self._data[CONF_MODEL]]
+        model = MODELS.get(self._data.get(CONF_MODEL), MODELS[MODEL_AMP16])
         if user_input is not None:
             self._data.update(_extract_zones(user_input, model["zones"]))
             _apply_setup_defaults(self._data)
@@ -327,8 +357,12 @@ class C4AudioConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class C4AudioOptionsFlow(config_entries.OptionsFlow):
-    def __init__(self, entry: config_entries.ConfigEntry) -> None:
-        self._entry = entry
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        self._flow_entry = config_entry
+
+    @property
+    def _entry(self) -> config_entries.ConfigEntry:
+        return getattr(self, "config_entry", None) or self._flow_entry
 
     def _merged_options(self, packed: dict[str, Any]) -> dict[str, Any]:
         merged = dict(self._entry.options)

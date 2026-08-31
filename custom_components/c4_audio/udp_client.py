@@ -121,6 +121,9 @@ async def async_probe_identity(host: str, port: int, timeout: float) -> ProbeIde
             info = info_pkt.args[0].strip('"')
         asw = await client.async_send("0g", "c4.asw.ain")
         amp = await client.async_send("0g", "c4.amp.ain")
+    except Exception:  # noqa: BLE001
+        _LOGGER.exception("Identity probe failed for %s:%s", host, port)
+        return None
     finally:
         await client.async_stop()
 

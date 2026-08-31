@@ -11,11 +11,6 @@ from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 
-try:
-    from homeassistant.data_entry_flow import section
-except ImportError:  # Home Assistant < 2024.6
-    section = None  # type: ignore[misc, assignment]
-
 from .const import (
     CONF_ENABLE_EQ,
     CONF_IDENT,
@@ -93,25 +88,11 @@ def _zone_schema(count: int, stored: dict[int, dict]) -> dict[Any, Any]:
         cfg = stored.get(index, {})
         name = cfg.get("name") or ""
         area = cfg.get("area_id")
-        name_selector = _text_box(prefix=f"Zone {index}")
-        if section is not None:
-            inner: dict[Any, Any] = {}
-            if name:
-                inner[vol.Optional("name", default=name)] = name_selector
-            else:
-                inner[vol.Optional("name")] = name_selector
-            if area:
-                inner[vol.Optional("area", default=area)] = selector.AreaSelector()
-            else:
-                inner[vol.Optional("area")] = selector.AreaSelector()
-            fields[vol.Required(f"zone_{index}")] = section(
-                vol.Schema(inner), {"collapsed": False}
-            )
-            continue
+        name_box = _text_box(prefix=f"Zone {index} Name")
         if name:
-            fields[vol.Optional(_zone_name_key(index), default=name)] = name_selector
+            fields[vol.Optional(_zone_name_key(index), default=name)] = name_box
         else:
-            fields[vol.Optional(_zone_name_key(index))] = name_selector
+            fields[vol.Optional(_zone_name_key(index))] = name_box
         if area:
             fields[vol.Optional(_zone_area_key(index), default=area)] = selector.AreaSelector()
         else:
@@ -123,7 +104,7 @@ def _input_schema(count: int, stored: list[str]) -> dict[Any, Any]:
     fields: dict[Any, Any] = {}
     for index in range(1, count + 1):
         default = stored[index - 1] if index - 1 < len(stored) else ""
-        box = _text_box(prefix=f"Input {index}")
+        box = _text_box(prefix=f"Input {index} Name")
         if default:
             fields[vol.Optional(_input_name_key(index), default=default)] = box
         else:

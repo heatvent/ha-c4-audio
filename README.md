@@ -17,11 +17,9 @@ Add **one integration entry per chassis**. Two 8-zone amps plus a switch is thre
 
 ## Install (HACS)
 
-1. HACS → Integrations → Custom repositories → this GitHub repo, category **Integration**.
+1. HACS → Integrations → Custom repositories → `https://github.com/heatvent/ha-c4-audio`, category **Integration**.
 2. Download **Control4 Audio**, restart Home Assistant.
 3. Settings → Devices & Services → Add Integration → **Control4 Audio**.
-
-Until the repo is on GitHub, copy `custom_components/c4_audio` into `/config/custom_components/` and restart.
 
 ## Setup
 

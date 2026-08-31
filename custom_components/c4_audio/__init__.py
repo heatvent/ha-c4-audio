@@ -13,7 +13,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
-from .const import DOMAIN, MODELS, PLATFORMS
+from .const import CONF_IDENT, DOMAIN, MODELS, PLATFORMS
 from .coordinator import C4AudioCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -131,10 +131,11 @@ def _register_services(hass: HomeAssistant) -> None:
 def device_info_for(coordinator: C4AudioCoordinator) -> DeviceInfo:
     model = MODELS[coordinator.model_id]
     return DeviceInfo(
-        identifiers={(DOMAIN, coordinator.host)},
+        identifiers={(DOMAIN, coordinator.entry.data.get(CONF_IDENT, coordinator.host))},
         name=coordinator.entry.title,
         manufacturer="Control4",
         model=model["name"],
         sw_version=coordinator.state.firmware,
+        serial_number=coordinator.entry.data.get(CONF_IDENT),
         configuration_url=None,
     )

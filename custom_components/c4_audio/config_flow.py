@@ -12,6 +12,7 @@ from homeassistant.helpers import selector
 
 from .const import (
     CONF_ENABLE_EQ,
+    CONF_IDENT,
     CONF_MODEL,
     CONF_ON_VOLUME,
     CONF_POLL_INTERVAL,
@@ -27,9 +28,13 @@ from .const import (
     DEFAULT_SWITCH_ON_VOLUME,
     DEFAULT_UDP_TIMEOUT,
     DOMAIN,
+    MODEL_AMP16,
     MODELS,
 )
-from .udp_client import async_probe_firmware
+from .discovery import async_sddp_search, identity_from_info
+from .udp_client import async_probe_identity
+
+MANUAL_ENTRY = "manual"
 
 
 def _default_lines(count: int, prefix: str) -> str:
@@ -44,7 +49,7 @@ def _model_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
             vol.Required(CONF_HOST, default=defaults.get(CONF_HOST, "")): str,
             vol.Required(CONF_PORT, default=defaults.get(CONF_PORT, DEFAULT_PORT)): int,
             vol.Required(
-                CONF_MODEL, default=defaults.get(CONF_MODEL, "c4_16amp3_b")
+                CONF_MODEL, default=defaults.get(CONF_MODEL, MODEL_AMP16)
             ): vol.In({key: info["name"] for key, info in MODELS.items()}),
         }
     )
@@ -57,23 +62,111 @@ class C4AudioConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
+        self._discovered: list = []
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
-        if user_input is not None:
-            host = user_input[CONF_HOST].strip()
-            port = int(user_input[CONF_PORT])
-            firmware = await async_probe_firmware(host, port, DEFAULT_UDP_TIMEOUT)
-            if firmware is None:
-                errors["base"] = "cannot_connect"
-            else:
-                await self.async_set_unique_id(host.lower())
-                self._abort_if_unique_id_configured()
-                self._data = {**user_input, CONF_HOST: host}
-                return await self.async_step_names()
-        return self.async_show_form(
-            step_id="user", data_schema=_model_schema(), errors=errors
-        )
+        if user_input is None:
+            self._discovered = await async_sddp_search()
+            if self._discovered:
+                return await self.async_step_discover()
+            return self.async_show_form(step_id="user", data_schema=_model_schema())
+        return await self._async_validate_manual(user_input, errors)
+
+    async def async_step_discover(self, user_input: dict[str, Any] | None = None):
+        if user_input is None:
+            options = [
+                selector.SelectOptionDict(
+                    value=device.ident,
+                    label=f"{device.model_name or device.sddp_type or 'Control4'} ({device.host})",
+                )
+                for device in self._discovered
+            ]
+            options.append(
+                selector.SelectOptionDict(value=MANUAL_ENTRY, label="Enter IP address manually")
+            )
+            return self.async_show_form(
+                step_id="discover",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required("device"): selector.SelectSelector(
+                            selector.SelectSelectorConfig(
+                                options=options, mode=selector.SelectSelectorMode.DROPDOWN
+                            )
+                        )
+                    }
+                ),
+            )
+        if user_input["device"] == MANUAL_ENTRY:
+            return self.async_show_form(step_id="user", data_schema=_model_schema())
+        device = next(item for item in self._discovered if item.ident == user_input["device"])
+        identity = await async_probe_identity(device.host, DEFAULT_PORT, DEFAULT_UDP_TIMEOUT)
+        if identity is None:
+            return self.async_show_form(
+                step_id="user",
+                data_schema=_model_schema(
+                    {
+                        CONF_HOST: device.host,
+                        CONF_NAME: device.model_name or "Control4 Amp",
+                        CONF_MODEL: device.suggested_model or MODEL_AMP16,
+                    }
+                ),
+                errors={"base": "cannot_connect"},
+            )
+        unique = identity_from_info(identity.info, device.ident)
+        await self.async_set_unique_id(unique)
+        self._abort_if_unique_id_configured(updates={CONF_HOST: device.host})
+        model = identity.model_id or device.suggested_model or MODEL_AMP16
+        self._data = {
+            CONF_NAME: device.model_name or device.ident,
+            CONF_HOST: device.host,
+            CONF_PORT: DEFAULT_PORT,
+            CONF_MODEL: model,
+            CONF_IDENT: unique,
+        }
+        return await self.async_step_names()
+
+    async def async_step_dhcp(self, discovery_info: Any):
+        host = discovery_info.ip
+        identity = await async_probe_identity(host, DEFAULT_PORT, DEFAULT_UDP_TIMEOUT)
+        if identity is None or identity.model_id is None:
+            return self.async_abort(reason="not_audio_chassis")
+        unique = identity_from_info(identity.info, getattr(discovery_info, "macaddress", host))
+        await self.async_set_unique_id(unique)
+        self._abort_if_unique_id_configured(updates={CONF_HOST: host})
+        self._data = {
+            CONF_NAME: identity.info or host,
+            CONF_HOST: host,
+            CONF_PORT: DEFAULT_PORT,
+            CONF_MODEL: identity.model_id,
+            CONF_IDENT: unique,
+        }
+        return await self.async_step_names()
+
+    async def _async_validate_manual(
+        self, user_input: dict[str, Any], errors: dict[str, str]
+    ):
+        host = user_input[CONF_HOST].strip()
+        port = int(user_input[CONF_PORT])
+        identity = await async_probe_identity(host, port, DEFAULT_UDP_TIMEOUT)
+        if identity is None:
+            errors["base"] = "cannot_connect"
+            return self.async_show_form(
+                step_id="user", data_schema=_model_schema(user_input), errors=errors
+            )
+        unique = identity_from_info(identity.info, host)
+        await self.async_set_unique_id(unique)
+        self._abort_if_unique_id_configured(updates={CONF_HOST: host})
+        model = user_input.get(CONF_MODEL) or identity.model_id or MODEL_AMP16
+        if identity.model_id:
+            model = identity.model_id
+        self._data = {
+            **user_input,
+            CONF_HOST: host,
+            CONF_MODEL: model,
+            CONF_IDENT: unique,
+        }
+        return await self.async_step_names()
 
     async def async_step_names(self, user_input: dict[str, Any] | None = None):
         model = MODELS[self._data[CONF_MODEL]]
@@ -127,16 +220,14 @@ class C4AudioConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         ]
         schema: dict[Any, Any] = {}
         if switches:
-            schema[
-                vol.Optional(CONF_SWITCH_ENTRY_ID)
-            ] = selector.SelectSelector(
+            schema[vol.Optional(CONF_SWITCH_ENTRY_ID)] = selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=switches, mode=selector.SelectSelectorMode.DROPDOWN
                 )
             )
-            schema[
-                vol.Optional(CONF_SWITCH_FEEDS, default=DEFAULT_SWITCH_FEEDS)
-            ] = selector.TextSelector(selector.TextSelectorConfig(multiline=True))
+            schema[vol.Optional(CONF_SWITCH_FEEDS, default=DEFAULT_SWITCH_FEEDS)] = (
+                selector.TextSelector(selector.TextSelectorConfig(multiline=True))
+            )
         if not schema:
             return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
         return self.async_show_form(step_id="link", data_schema=vol.Schema(schema))
@@ -203,9 +294,7 @@ class C4AudioOptionsFlow(config_entries.OptionsFlow):
                     ),
                 )
             ] = bool
-            switches = [
-                selector.SelectOptionDict(value="", label="Not linked")
-            ] + [
+            switches = [selector.SelectOptionDict(value="", label="Not linked")] + [
                 selector.SelectOptionDict(value=entry.entry_id, label=entry.title)
                 for entry in self.hass.config_entries.async_entries(DOMAIN)
                 if MODELS.get(entry.data.get(CONF_MODEL), {}).get("kind") == "matrix"
@@ -213,11 +302,11 @@ class C4AudioOptionsFlow(config_entries.OptionsFlow):
             current_switch = self._entry.options.get(
                 CONF_SWITCH_ENTRY_ID, self._entry.data.get(CONF_SWITCH_ENTRY_ID, "")
             ) or ""
-            fields[
-                vol.Optional(CONF_SWITCH_ENTRY_ID, default=current_switch)
-            ] = selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=switches, mode=selector.SelectSelectorMode.DROPDOWN
+            fields[vol.Optional(CONF_SWITCH_ENTRY_ID, default=current_switch)] = (
+                selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=switches, mode=selector.SelectSelectorMode.DROPDOWN
+                    )
                 )
             )
             fields[

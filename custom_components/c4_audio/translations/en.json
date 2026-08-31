@@ -11,6 +11,13 @@
           "model": "Hardware"
         }
       },
+      "discover": {
+        "title": "Found Control4 audio devices",
+        "description": "These chassis answered SDDP (the same discovery Composer uses). Identity is the device Host/UUID, so DHCP IP changes stay linked.",
+        "data": {
+          "device": "Device"
+        }
+      },
       "names": {
         "title": "Zones and sources",
         "description": "One name per line, physical jack 1 at the top. Put a single hyphen on a line to skip that jack (no entity).",
@@ -36,7 +43,8 @@
       "cannot_connect": "No UDP reply on port 8750. Check the IP and that Director is not blocking the chassis."
     },
     "abort": {
-      "already_configured": "That IP address is already set up."
+      "already_configured": "That device is already set up.",
+      "not_audio_chassis": "That Control4 device is not an amp or audio switch."
     }
   },
   "options": {

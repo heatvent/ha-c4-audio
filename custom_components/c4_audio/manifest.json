@@ -6,8 +6,13 @@
   "documentation": "https://github.com/heatvent/ha-c4-audio",
   "integration_type": "hub",
   "iot_class": "local_polling",
+  "dhcp": [
+    {
+      "macaddress": "000FFF*"
+    }
+  ],
   "issue_tracker": "https://github.com/heatvent/ha-c4-audio/issues",
   "loggers": ["custom_components.c4_audio"],
   "requirements": [],
-  "version": "0.2.0"
+  "version": "0.2.2"
 }

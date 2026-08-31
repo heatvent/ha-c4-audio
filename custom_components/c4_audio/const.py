@@ -17,8 +17,7 @@ CONF_POLL_INTERVAL = "poll_interval"
 CONF_UDP_TIMEOUT = "udp_timeout"
 CONF_ENABLE_EQ = "enable_eq"
 CONF_SWITCH_ENTRY_ID = "switch_entry_id"
-CONF_SWITCH_FEEDS = "switch_feeds"
-DEFAULT_SWITCH_FEEDS = "1=1"
+CONF_IDENT = "ident"
 
 # Serial-over-UDP framing used by C4 Ethernet audio hardware.
 CMD_PREFIX_SET = "0s"

@@ -144,6 +144,50 @@ A **Triad** 16×16 uses TCP binary and is not this integration.
 ## Independent public sources
 
 - [HA: direct control of C4 amp (UDP 8750)](https://community.home-assistant.io/t/home-assistant-direct-control-of-control4-amp-and-tuner-no-plugin-needed/103497)
-- [kmakar89/Home-Assistant---Control4](https://github.com/kmakar89/Home-Assistant---Control4)
-- [OtisPresley/control4-mediaplayer](https://github.com/OtisPresley/control4-mediaplayer) (`out`, `chvol`, `mute`, `psave`, `trebgain`, `bassgain`, `bal`, `chvolmax` warning)
+- [kmakar89/Home-Assistant---Control4](https://github.com/kmakar89/Home-Assistant---Control4) — reviewed below
+- [OtisPresley/control4-mediaplayer](https://github.com/OtisPresley/control4-mediaplayer) — reviewed below
 - Zigbee2MQTT C4 keypad discussion: same `0s`/`0r` + `c4.*.*` ASCII on a different product class
+
+### kmakar89/Home-Assistant---Control4 (reviewed)
+
+Hard-coded HA services for a **4-zone matrix amp** plus a **separate Control4 tuner** chassis. Not a HACS media-player integration, and it does **not** talk to an audio switch (`c4.asw` never appears).
+
+What it actually sends (UDP 8750):
+
+| Device | Command | Meaning |
+|---|---|---|
+| Amp | `c4.amp.out {zone} {input}` | Route. `00` = off |
+| Amp | `c4.amp.chvol {zone} {hex}` | Volume |
+| Amp | *(no mute, no GET/poll, no EQ)* | Optimistic UI only |
+| Tuner | `c4.mt.tafreq2 00 {hex}` | Tuner 1 FM frequency |
+| Tuner | `c4.mt.tbfreq2 00 {hex}` | Tuner 2 FM frequency |
+
+FM encoding: station in MHz × 100, then hex (example `94.9` → `9490` → `2512`). That is a different product class from the amp/switch; add it only if a C4 tuner is on the LAN.
+
+Volume in that repo is **percent + 160**, then hex. Director captures and this integration use **percent + 155**. `+160` plays a few percent louder than Composer. Default power-on in their scripts is `chvol … a9`.
+
+Framing is looser than Director (`0s2a` + two random digits, extra space before `\r\n`). The chassis still ACKs; sequence matching is not used.
+
+Great Room is two amp zones (`03` and `04`) driven together — useful if a “room” is a pair of speaker outputs. Source names are mapped in automations (Tuner → jack 1, Volumio → 3, Bluetooth → 4), which is the same idea as this integration’s named inputs.
+
+### OtisPresley/control4-mediaplayer (reviewed)
+
+HACS **amp-only** media player (fork of Hansen8601). One HA config entry **per zone**, not per chassis. Volume formula matches this integration: **percent + 155**. Mute requires `00`/`01`. No `c4.asw` / matrix switch. No GET polling — README claims the amp does not report state; that is **false** on 16AMP3 / AVM-16S1 (`ain`, `avol`, `amut`, unsolicited `0t`).
+
+Commands it sends:
+
+| Command | Role | Notes vs this project |
+|---|---|---|
+| `c4.amp.out {zone} {input}` | Route; `00` = off | Same |
+| `c4.amp.chvol {zone} {hex}` | Volume | Same scale (`9b` = 0%) |
+| `c4.amp.mute {zone} 00\|01` | Mute | If reply contains `n01` or times out, they `chvol` to `9b` / restore |
+| `c4.amp.bassgain` / `trebgain` | EQ sliders −12…+12 | Same two’s-complement hex |
+| `c4.amp.bal {zone} {signed}` | Balance −10…+10 | SET name `bal`; AMP108 GET is `abal`. Not live-tested here |
+| `c4.amp.psave 00 00` / `01 00` | Wake / power-save | **Two-byte** form. AMP108 accepted one-byte `psave 00`. 16AMP3 GET `psave` is `n01` |
+| `c4.amp.chvolmax` | Hardware volume cap | **Firmware bug**: SET jumps live volume to the cap. They now keep the cap in software and only ever send `chvol`. Do not use from a slider |
+| `c4.amp.chmode {zone} 00\|01\|02` | Output topology | `00` stereo, `01` mono summed, `02` bridged mono. In their manager, not exposed in the UI. Untested on 16AMP3 |
+| `c4.amp.ingain {input} {hex}` | Input trim | They treat `80` as 0 dB, `7A`…`86` as −6…+6 dB. AMP108 captures used **`igain`**, not `ingain`. Do not send `ingain` until probed |
+
+Framing is the kmakar style (`0s2a` + two random digits). They match replies by prefix (`0r2aXX`). Party mode is software: all zones `out` to the same input.
+
+Useful product ideas (not new UDP): software max-volume cap, mute fallback, restore entity without blasting on HA reboot, optional `chmode` if we confirm it on the 16AMP3.

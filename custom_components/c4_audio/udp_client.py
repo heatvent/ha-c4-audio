@@ -6,6 +6,7 @@ import asyncio
 import logging
 import socket
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from .protocol import ParsedPacket, build_frame, next_sequence, parse_packet
 
@@ -91,14 +92,49 @@ class C4UdpClient:
 
 async def async_probe_firmware(host: str, port: int, timeout: float) -> str | None:
     """Return firmware string if the chassis answers GET c4.sy.fwv, else None."""
+    identity = await async_probe_identity(host, port, timeout)
+    return None if identity is None else identity.firmware
+
+
+@dataclass
+class ProbeIdentity:
+    firmware: str | None
+    info: str | None
+    model_id: str | None
+
+
+async def async_probe_identity(host: str, port: int, timeout: float) -> ProbeIdentity | None:
+    """GET firmware/info and classify amp vs switch from ain replies."""
+    from .const import MODEL_AMP108, MODEL_AMP16, MODEL_AMP16ZONE, MODEL_MATRIX16
+    from .protocol import parse_hex_list
+
     client = C4UdpClient(host, port, timeout)
     try:
         await client.async_start()
-        packet = await client.async_send("0g", "c4.sy.fwv")
+        fw = await client.async_send("0g", "c4.sy.fwv")
+        if fw is None:
+            return None
+        firmware = fw.args[0].strip('"') if fw.args else ""
+        info_pkt = await client.async_send("0g", "c4.sy.info")
+        info = None
+        if info_pkt and info_pkt.args:
+            info = info_pkt.args[0].strip('"')
+        asw = await client.async_send("0g", "c4.asw.ain")
+        amp = await client.async_send("0g", "c4.amp.ain")
     finally:
         await client.async_stop()
-    if packet is None:
-        return None
-    if packet.args:
-        return packet.args[0].strip('"')
-    return ""
+
+    model_id = None
+    if asw is not None and asw.status_code not in {"n01", "e00"} and asw.args:
+        values = [item for item in parse_hex_list(asw.args) if item is not None]
+        if len(values) >= 8:
+            model_id = MODEL_MATRIX16
+    if model_id is None and amp is not None and amp.status_code not in {"n01", "e00"}:
+        values = [item for item in parse_hex_list(amp.args) if item is not None]
+        if len(values) >= 16:
+            model_id = MODEL_AMP16ZONE
+        elif len(values) >= 8:
+            model_id = MODEL_AMP16
+        elif len(values) >= 4:
+            model_id = MODEL_AMP108
+    return ProbeIdentity(firmware=firmware, info=info, model_id=model_id)

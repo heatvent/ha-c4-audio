@@ -13,6 +13,7 @@ from homeassistant.helpers import selector
 from .const import (
     CONF_ENABLE_EQ,
     CONF_IDENT,
+    CONF_MAX_VOLUME,
     CONF_MODEL,
     CONF_ON_VOLUME,
     CONF_POLL_INTERVAL,
@@ -22,6 +23,7 @@ from .const import (
     CONF_UDP_TIMEOUT,
     CONF_ZONE_NAMES,
     CONF_ZONES,
+    DEFAULT_MAX_VOLUME,
     DEFAULT_ON_VOLUME,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_PORT,
@@ -32,15 +34,12 @@ from .const import (
     MODEL_AMP16,
     MODELS,
     SETUP_MODELS,
+    SKIP_NAME,
 )
 from .discovery import async_sddp_search, identity_from_info
 from .udp_client import async_probe_identity
 
 MANUAL_ENTRY = "manual"
-
-
-def _default_lines(count: int, prefix: str) -> str:
-    return "\n".join(f"{prefix} {index}" for index in range(1, count + 1))
 
 
 def _zone_name_key(index: int) -> str:
@@ -51,6 +50,10 @@ def _zone_area_key(index: int) -> str:
     return f"zone_{index}_area"
 
 
+def _input_name_key(index: int) -> str:
+    return f"input_{index}_name"
+
+
 def _stored_zone_map(data: dict[str, Any], options: dict[str, Any] | None, count: int) -> dict[int, dict]:
     from .routing import parse_zone_map
 
@@ -59,18 +62,39 @@ def _stored_zone_map(data: dict[str, Any], options: dict[str, Any] | None, count
     return parse_zone_map(blob, count, legacy)
 
 
+def _stored_input_names(data: dict[str, Any], options: dict[str, Any] | None, count: int) -> list[str]:
+    text = (options or {}).get(CONF_SOURCE_NAMES, data.get(CONF_SOURCE_NAMES, ""))
+    lines = (text or "").splitlines()
+    names: list[str] = []
+    for index in range(count):
+        if index < len(lines):
+            line = lines[index].strip()
+            names.append("" if line == SKIP_NAME else line)
+        else:
+            names.append("")
+    return names
+
+
 def _zone_schema(count: int, stored: dict[int, dict]) -> dict[Any, Any]:
     fields: dict[Any, Any] = {}
     for index in range(1, count + 1):
         cfg = stored.get(index, {})
-        fields[vol.Optional(_zone_name_key(index), default=cfg.get("name") or "")] = str
+        fields[vol.Optional(_zone_name_key(index), default=cfg.get("name") or "")] = (
+            selector.TextSelector()
+        )
         area = cfg.get("area_id")
         if area:
-            fields[
-                vol.Optional(_zone_area_key(index), default=area)
-            ] = selector.AreaSelector()
+            fields[vol.Optional(_zone_area_key(index), default=area)] = selector.AreaSelector()
         else:
             fields[vol.Optional(_zone_area_key(index))] = selector.AreaSelector()
+    return fields
+
+
+def _input_schema(count: int, stored: list[str]) -> dict[Any, Any]:
+    fields: dict[Any, Any] = {}
+    for index in range(1, count + 1):
+        default = stored[index - 1] if index - 1 < len(stored) else ""
+        fields[vol.Optional(_input_name_key(index), default=default)] = selector.TextSelector()
     return fields
 
 
@@ -78,14 +102,36 @@ def _extract_zones(user_input: dict[str, Any], count: int) -> dict[str, Any]:
     packed = dict(user_input)
     zones: dict[str, dict[str, str | None]] = {}
     for index in range(1, count + 1):
-        name_key = _zone_name_key(index)
-        area_key = _zone_area_key(index)
-        name = str(packed.pop(name_key, "") or "").strip()
-        area = packed.pop(area_key, None) or None
+        name = str(packed.pop(_zone_name_key(index), "") or "").strip()
+        area = packed.pop(_zone_area_key(index), None) or None
         zones[str(index)] = {"name": name, "area_id": area}
     packed[CONF_ZONES] = zones
     packed.pop(CONF_ZONE_NAMES, None)
     return packed
+
+
+def _extract_inputs(user_input: dict[str, Any], count: int) -> dict[str, Any]:
+    packed = dict(user_input)
+    lines: list[str] = []
+    for index in range(1, count + 1):
+        name = str(packed.pop(_input_name_key(index), "") or "").strip()
+        lines.append(name if name else SKIP_NAME)
+    packed[CONF_SOURCE_NAMES] = "\n".join(lines)
+    return packed
+
+
+def _apply_setup_defaults(data: dict[str, Any]) -> dict[str, Any]:
+    model = MODELS[data[CONF_MODEL]]
+    is_matrix = model["kind"] == "matrix"
+    data.setdefault(
+        CONF_ON_VOLUME, DEFAULT_SWITCH_ON_VOLUME if is_matrix else DEFAULT_ON_VOLUME
+    )
+    data.setdefault(CONF_MAX_VOLUME, DEFAULT_MAX_VOLUME)
+    data.setdefault(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL)
+    data.setdefault(CONF_UDP_TIMEOUT, DEFAULT_UDP_TIMEOUT)
+    data.setdefault(CONF_ENABLE_EQ, not is_matrix)
+    data.setdefault(CONF_SWITCH_FEEDS, DEFAULT_SWITCH_FEEDS)
+    return data
 
 
 def _model_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
@@ -171,7 +217,7 @@ class C4AudioConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_MODEL: model,
             CONF_IDENT: unique,
         }
-        return await self.async_step_names()
+        return await self.async_step_inputs()
 
     async def async_step_dhcp(self, discovery_info: Any):
         host = discovery_info.ip
@@ -188,7 +234,7 @@ class C4AudioConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_MODEL: identity.model_id,
             CONF_IDENT: unique,
         }
-        return await self.async_step_names()
+        return await self.async_step_inputs()
 
     async def _async_validate_manual(
         self, user_input: dict[str, Any], errors: dict[str, str]
@@ -213,63 +259,31 @@ class C4AudioConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_MODEL: model,
             CONF_IDENT: unique,
         }
-        return await self.async_step_names()
+        return await self.async_step_inputs()
 
-    async def async_step_names(self, user_input: dict[str, Any] | None = None):
+    async def async_step_inputs(self, user_input: dict[str, Any] | None = None):
         model = MODELS[self._data[CONF_MODEL]]
-        is_matrix = model["kind"] == "matrix"
-        default_volume = DEFAULT_SWITCH_ON_VOLUME if is_matrix else DEFAULT_ON_VOLUME
+        if user_input is not None:
+            self._data.update(_extract_inputs(user_input, model["inputs"]))
+            return await self.async_step_outputs()
+        stored = _stored_input_names(self._data, None, model["inputs"])
+        return self.async_show_form(
+            step_id="inputs",
+            data_schema=vol.Schema(_input_schema(model["inputs"], stored)),
+        )
+
+    async def async_step_outputs(self, user_input: dict[str, Any] | None = None):
+        model = MODELS[self._data[CONF_MODEL]]
         if user_input is not None:
             self._data.update(_extract_zones(user_input, model["zones"]))
-            if is_matrix:
-                return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
-            return await self.async_step_link()
+            _apply_setup_defaults(self._data)
+            return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
 
         stored = _stored_zone_map(self._data, None, model["zones"])
-        fields: dict[Any, Any] = {}
-        fields.update(_zone_schema(model["zones"], stored))
-        fields[
-            vol.Required(
-                CONF_SOURCE_NAMES, default=_default_lines(model["inputs"], "Input")
-            )
-        ] = selector.TextSelector(selector.TextSelectorConfig(multiline=True))
-        fields[vol.Required(CONF_ON_VOLUME, default=default_volume)] = vol.All(
-            vol.Coerce(int), vol.Range(min=0, max=100)
+        return self.async_show_form(
+            step_id="outputs",
+            data_schema=vol.Schema(_zone_schema(model["zones"], stored)),
         )
-        fields[vol.Required(CONF_POLL_INTERVAL, default=DEFAULT_POLL_INTERVAL)] = vol.All(
-            vol.Coerce(int), vol.Range(min=5, max=300)
-        )
-        fields[vol.Required(CONF_UDP_TIMEOUT, default=DEFAULT_UDP_TIMEOUT)] = vol.All(
-            vol.Coerce(float), vol.Range(min=0.25, max=5.0)
-        )
-        fields[vol.Optional(CONF_ENABLE_EQ, default=not is_matrix)] = bool
-        return self.async_show_form(step_id="names", data_schema=vol.Schema(fields))
-
-    async def async_step_link(self, user_input: dict[str, Any] | None = None):
-        if user_input is not None:
-            data = {**self._data, **user_input}
-            if not data.get(CONF_SWITCH_ENTRY_ID):
-                data.pop(CONF_SWITCH_ENTRY_ID, None)
-            return self.async_create_entry(title=data[CONF_NAME], data=data)
-
-        switches = [
-            selector.SelectOptionDict(value=entry.entry_id, label=entry.title)
-            for entry in self.hass.config_entries.async_entries(DOMAIN)
-            if MODELS.get(entry.data.get(CONF_MODEL), {}).get("kind") == "matrix"
-        ]
-        schema: dict[Any, Any] = {}
-        if switches:
-            schema[vol.Optional(CONF_SWITCH_ENTRY_ID)] = selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=switches, mode=selector.SelectSelectorMode.DROPDOWN
-                )
-            )
-            schema[vol.Optional(CONF_SWITCH_FEEDS, default=DEFAULT_SWITCH_FEEDS)] = (
-                selector.TextSelector(selector.TextSelectorConfig(multiline=True))
-            )
-        if not schema:
-            return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
-        return self.async_show_form(step_id="link", data_schema=vol.Schema(schema))
 
     @staticmethod
     @callback
@@ -281,35 +295,70 @@ class C4AudioOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, entry: config_entries.ConfigEntry) -> None:
         self._entry = entry
 
+    def _merged_options(self, packed: dict[str, Any]) -> dict[str, Any]:
+        merged = dict(self._entry.options)
+        merged.update(packed)
+        return merged
+
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["inputs", "outputs", "settings"],
+        )
+
+    async def async_step_inputs(self, user_input: dict[str, Any] | None = None):
+        model = MODELS[self._entry.data[CONF_MODEL]]
+        if user_input is not None:
+            packed = _extract_inputs(user_input, model["inputs"])
+            return self.async_create_entry(title="", data=self._merged_options(packed))
+        stored = _stored_input_names(self._entry.data, dict(self._entry.options), model["inputs"])
+        return self.async_show_form(
+            step_id="inputs",
+            data_schema=vol.Schema(_input_schema(model["inputs"], stored)),
+        )
+
+    async def async_step_outputs(self, user_input: dict[str, Any] | None = None):
+        model = MODELS[self._entry.data[CONF_MODEL]]
+        if user_input is not None:
+            packed = _extract_zones(user_input, model["zones"])
+            return self.async_create_entry(title="", data=self._merged_options(packed))
+        stored = _stored_zone_map(self._entry.data, dict(self._entry.options), model["zones"])
+        return self.async_show_form(
+            step_id="outputs",
+            data_schema=vol.Schema(_zone_schema(model["zones"], stored)),
+        )
+
+    async def async_step_settings(self, user_input: dict[str, Any] | None = None):
         model = MODELS[self._entry.data[CONF_MODEL]]
         is_matrix = model["kind"] == "matrix"
         if user_input is not None:
-            packed = _extract_zones(user_input, model["zones"])
+            packed = dict(user_input)
+            if CONF_MAX_VOLUME in packed and CONF_ON_VOLUME in packed:
+                packed[CONF_ON_VOLUME] = min(int(packed[CONF_ON_VOLUME]), int(packed[CONF_MAX_VOLUME]))
             if not packed.get(CONF_SWITCH_ENTRY_ID):
                 packed[CONF_SWITCH_ENTRY_ID] = None
-            return self.async_create_entry(title="", data=packed)
+            return self.async_create_entry(title="", data=self._merged_options(packed))
 
         default_volume = DEFAULT_SWITCH_ON_VOLUME if is_matrix else DEFAULT_ON_VOLUME
-        stored = _stored_zone_map(self._entry.data, dict(self._entry.options), model["zones"])
         fields: dict[Any, Any] = {}
-        fields.update(_zone_schema(model["zones"], stored))
-        fields[
-            vol.Required(
-                CONF_SOURCE_NAMES,
-                default=self._entry.options.get(
-                    CONF_SOURCE_NAMES, self._entry.data.get(CONF_SOURCE_NAMES, "")
-                ),
-            )
-        ] = selector.TextSelector(selector.TextSelectorConfig(multiline=True))
-        fields[
-            vol.Required(
-                CONF_ON_VOLUME,
-                default=self._entry.options.get(
-                    CONF_ON_VOLUME, self._entry.data.get(CONF_ON_VOLUME, default_volume)
-                ),
-            )
-        ] = vol.All(vol.Coerce(int), vol.Range(min=0, max=100))
+        if not is_matrix:
+            fields[
+                vol.Required(
+                    CONF_ON_VOLUME,
+                    default=self._entry.options.get(
+                        CONF_ON_VOLUME, self._entry.data.get(CONF_ON_VOLUME, default_volume)
+                    ),
+                )
+            ] = vol.All(vol.Coerce(int), vol.Range(min=0, max=100))
+            fields[
+                vol.Required(
+                    CONF_MAX_VOLUME,
+                    default=self._entry.options.get(
+                        CONF_MAX_VOLUME,
+                        self._entry.data.get(CONF_MAX_VOLUME, DEFAULT_MAX_VOLUME),
+                    ),
+                )
+            ] = vol.All(vol.Coerce(int), vol.Range(min=1, max=100))
         fields[
             vol.Required(
                 CONF_POLL_INTERVAL,
@@ -342,9 +391,12 @@ class C4AudioOptionsFlow(config_entries.OptionsFlow):
                 for entry in self.hass.config_entries.async_entries(DOMAIN)
                 if MODELS.get(entry.data.get(CONF_MODEL), {}).get("kind") == "matrix"
             ]
-            current_switch = self._entry.options.get(
-                CONF_SWITCH_ENTRY_ID, self._entry.data.get(CONF_SWITCH_ENTRY_ID, "")
-            ) or ""
+            current_switch = (
+                self._entry.options.get(
+                    CONF_SWITCH_ENTRY_ID, self._entry.data.get(CONF_SWITCH_ENTRY_ID, "")
+                )
+                or ""
+            )
             fields[vol.Optional(CONF_SWITCH_ENTRY_ID, default=current_switch)] = (
                 selector.SelectSelector(
                     selector.SelectSelectorConfig(
@@ -362,8 +414,4 @@ class C4AudioOptionsFlow(config_entries.OptionsFlow):
                 )
             ] = selector.TextSelector(selector.TextSelectorConfig(multiline=True))
 
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(fields),
-            description_placeholders={"model": model["name"]},
-        )
+        return self.async_show_form(step_id="settings", data_schema=vol.Schema(fields))

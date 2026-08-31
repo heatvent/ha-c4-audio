@@ -71,6 +71,12 @@ def visible_names(names: list[str]) -> list[str]:
     return [name for name in names if name != SKIP_NAME]
 
 
+def clamp_volume(percent: int, max_volume: int) -> int:
+    """Keep a 0–100 volume at or below the software cap. Never send chvolmax."""
+    cap = max(0, min(100, int(max_volume)))
+    return max(0, min(cap, int(percent)))
+
+
 def parse_feeds(text: str | None) -> dict[int, int]:
     """Parse `amp_input=switch_output` lines. Default bus is amp in 1 ← switch out 1."""
     feeds: dict[int, int] = {}

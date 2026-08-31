@@ -55,7 +55,12 @@ def test_switch_namespace_and_unity_volume():
     assert cmds.decode_volume("64") == 100
 
 
-def test_amp_mute_requires_second_byte():
+def test_amp_volume_limit_command():
+    cmds = DeviceCommands("c4.amp", "chvol", "offset")
+    _prefix, body = cmds.set_volume_max(2, 40)
+    assert body == "c4.amp.chvolmax 02 c3"
+    _prefix, get_body = cmds.get_volume_limits()
+    assert get_body == "c4.amp.vlim"
     cmds = DeviceCommands("c4.amp", "chvol", "offset")
     _prefix, body = cmds.set_mute(2, False)
     assert body == "c4.amp.mute 02 00"

@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components"
 from routing import (
     KIND_LOCAL,
     KIND_SWITCH,
+    clamp_volume,
     displayed_amp_source,
     enabled_indexes,
     merged_source_list,
@@ -29,6 +30,13 @@ def test_split_names_keeps_indexes():
 def test_skip_hyphen_zones():
     names = split_names("Kitchen\n-\nPatio", 3, "Zone")
     assert enabled_indexes(names) == [1, 3]
+
+
+def test_clamp_volume_respects_software_cap():
+    assert clamp_volume(80, 40) == 40
+    assert clamp_volume(10, 40) == 10
+    assert clamp_volume(-5, 100) == 0
+    assert clamp_volume(120, 100) == 100
 
 
 def test_empty_zone_name_is_skipped():

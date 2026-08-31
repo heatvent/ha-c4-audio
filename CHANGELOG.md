@@ -2,6 +2,13 @@
 
 Versions are integers: **1**, **2**, **3**, and so on. Each new release increments by one.
 
+## [6]
+
+- Setup is three screens: IP and hardware, then inputs, then outputs
+- Volume, polling, timeout, and switch link stay at defaults until Configure → Settings
+- Configure is split into Inputs, Outputs, and Settings
+- Amp turn-on volume (`chvol` on power-on) and max volume (`chvolmax` while the zone is off) are in Settings; the switch stays at 100%
+
 ## [5]
 
 - Discovery lists only Control4 amps and the 16×16 switch (not Sony, WiiM, or other SDDP devices)
@@ -30,7 +37,8 @@ Versions are integers: **1**, **2**, **3**, and so on. Each new release incremen
 - Amp↔switch source carry-through
 - Zone/source names, polling, bass/treble, `send_command` / `set_route` / `turn_off_all`
 
-[5]: https://github.com/heatvent/ha-c4-audio/compare/v4...HEAD
+[6]: https://github.com/heatvent/ha-c4-audio/compare/v5...HEAD
+[5]: https://github.com/heatvent/ha-c4-audio/compare/v4...v5
 [4]: https://github.com/heatvent/ha-c4-audio/compare/v3...v4
 [3]: https://github.com/heatvent/ha-c4-audio/compare/v2...v3
 [2]: https://github.com/heatvent/ha-c4-audio/compare/v1...v2

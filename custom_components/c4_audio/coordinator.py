@@ -14,6 +14,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import (
     CONF_ENABLE_EQ,
+    CONF_MAX_VOLUME,
     CONF_MODEL,
     CONF_ON_VOLUME,
     CONF_POLL_INTERVAL,
@@ -23,6 +24,7 @@ from .const import (
     CONF_UDP_TIMEOUT,
     CONF_ZONE_NAMES,
     CONF_ZONES,
+    DEFAULT_MAX_VOLUME,
     DEFAULT_ON_VOLUME,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_SWITCH_FEEDS,
@@ -40,6 +42,7 @@ from .protocol import (
 )
 from .routing import (
     KIND_SWITCH,
+    clamp_volume,
     displayed_amp_source,
     enabled_indexes,
     merged_source_list,
@@ -147,10 +150,27 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
     @property
     def on_volume(self) -> int:
         default = DEFAULT_SWITCH_ON_VOLUME if self.is_matrix else DEFAULT_ON_VOLUME
-        return int(
-            self.entry.options.get(
-                CONF_ON_VOLUME, self.entry.data.get(CONF_ON_VOLUME, default)
-            )
+        return clamp_volume(
+            int(
+                self.entry.options.get(
+                    CONF_ON_VOLUME, self.entry.data.get(CONF_ON_VOLUME, default)
+                )
+            ),
+            self.max_volume,
+        )
+
+    @property
+    def max_volume(self) -> int:
+        if self.is_matrix:
+            return 100
+        return clamp_volume(
+            int(
+                self.entry.options.get(
+                    CONF_MAX_VOLUME,
+                    self.entry.data.get(CONF_MAX_VOLUME, DEFAULT_MAX_VOLUME),
+                )
+            ),
+            100,
         )
 
     @property
@@ -266,7 +286,7 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
     async def async_turn_on(self, zone: int) -> None:
         current = self.state.zones[zone]
         source = current.source or 1
-        volume = current.volume or self.on_volume
+        volume = self.on_volume
         if self.model.get("wake_power_save"):
             await self.client.async_send(*self.cmds.set_power_save("00"))
         await self.async_route_output(zone, source)
@@ -278,6 +298,9 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
     async def async_turn_off(self, zone: int, *, confirm: bool = True) -> None:
         await self.client.async_send(*self.cmds.set_mute(zone, True))
         await self.client.async_send(*self.cmds.set_output(zone, 0))
+        if not self.is_matrix:
+            # Composer volume limit. Firmware jumps live level if this is sent while playing.
+            await self.client.async_send(*self.cmds.set_volume_max(zone, self.max_volume))
         self.state.zones[zone].source = 0
         self.state.zones[zone].muted = True
         self.async_set_updated_data(self.state)
@@ -291,7 +314,7 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
 
     async def async_set_volume(self, zone: int, volume: float) -> None:
         percent = int(round(volume * 100)) if volume <= 1 else int(round(volume))
-        percent = max(0, min(100, percent))
+        percent = clamp_volume(percent, self.max_volume)
         await self.client.async_send(*self.cmds.set_volume(zone, percent))
         self.state.zones[zone].volume = percent
         if percent > 0:

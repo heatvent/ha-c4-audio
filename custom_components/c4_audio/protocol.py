@@ -209,6 +209,13 @@ class DeviceCommands:
     def set_volume(self, zone: int, percent: float) -> tuple[str, str]:
         return CMD_PREFIX_SET, f"{self.ns}.{self.volume_set} {to_hex_byte(zone)} {self.encode_volume(percent)}"
 
+    def get_volume_limits(self) -> tuple[str, str]:
+        return CMD_PREFIX_GET, f"{self.ns}.vlim"
+
+    def set_volume_max(self, zone: int, percent: float) -> tuple[str, str]:
+        """Composer volume limit. Same hex scale as chvol. Do not send while the zone is playing."""
+        return CMD_PREFIX_SET, f"{self.ns}.chvolmax {to_hex_byte(zone)} {self.encode_volume(percent)}"
+
     def set_bass(self, zone: int, db: int) -> tuple[str, str]:
         return CMD_PREFIX_SET, f"{self.ns}.bassgain {to_hex_byte(zone)} {signed_gain_to_hex(db)}"
 

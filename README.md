@@ -26,10 +26,12 @@ Releases and version history: [CHANGELOG.md](CHANGELOG.md).
 
 ## Setup
 
-1. Add the **switch** first (if you have one). Name outputs and inputs in jack order. Use `-` on a line to skip unused jacks.
-2. Add each **amp**. Name rooms the same way.
-3. On the amp, link the switch and set feeds. Default `1=1` means **amp input 1 is fed by switch output 1**. Extra buses are extra lines (`2=2`).
-4. Amp room source lists then show **switch inputs** (WiiM, Retro Hi-Fi, …) plus any leftover local amp jacks.
+1. Add Integration → **Control4 Audio**. Pick the chassis (or enter IP) and the hardware type.
+2. **Inputs:** one name box per jack. Leave a box empty to skip that input.
+3. **Outputs:** one name box and a room dropdown per jack. Leave a name empty to skip that output.
+4. Volume, polling, UDP timeout, bass/treble, and amp↔switch link stay at defaults. Change them later under **Configure** if needed.
+
+Add the **switch** first if you have one, then each **amp**. On the amp, **Configure → Settings** to link the switch. Default feed `1=1` means amp input 1 is fed by switch output 1.
 
 Selecting **WiiM Pro** on Kitchen sends:
 
@@ -48,7 +50,7 @@ Each chassis is polled about every **15 seconds** (configurable 5–300): firmwa
 **Amp (`c4.amp`)**
 
 - Route / power: `out`, mute `00`/`01`
-- Volume: `chvol` (percent + 155). Step ±1% in the UI. Do **not** send `chvolmax`.
+- Volume: `chvol` (percent + 155). Step ±1% in the UI. Turn-on volume is that same `chvol` when a zone turns on. Max volume is Composer’s volume limit (`chvolmax`); it is only written when the zone is off because SET while playing jumps the live level. Do not use `chvolmax` as a slider.
 - Tone: `bassgain` / `trebgain` as number entities
 - Poll: `ain`, `avol`, `amut`, `abss`, `atrb`, `c4.sy.fwv`
 - `psave` only on AMP108 (16AMP3 returns `n01`)

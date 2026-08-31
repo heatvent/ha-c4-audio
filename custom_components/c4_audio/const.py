@@ -11,6 +11,7 @@ DEFAULT_SWITCH_ON_VOLUME = 100
 
 CONF_MODEL = "model"
 CONF_ZONE_NAMES = "zone_names"
+CONF_ZONES = "zones"
 CONF_SOURCE_NAMES = "source_names"
 CONF_ON_VOLUME = "on_volume"
 CONF_POLL_INTERVAL = "poll_interval"
@@ -46,7 +47,7 @@ MODELS = {
         "wake_power_save": True,
     },
     MODEL_AMP16: {
-        "name": "C4-16AMP3-B (8-zone amp)",
+        "name": "C4-16AMP3-B (8-zone speaker amp)",
         "zones": 8,
         "inputs": 8,
         "kind": "amplifier",
@@ -66,7 +67,7 @@ MODELS = {
         "wake_power_save": False,
     },
     MODEL_MATRIX16: {
-        "name": "AVM-16S1-B / C4-16ZAMSV3-B (16x16 switch)",
+        "name": "C4-16ZAMSV3-B / AVM-16S1-B (16x16 audio switch)",
         "zones": 16,
         "inputs": 16,
         "kind": "matrix",
@@ -75,4 +76,9 @@ MODELS = {
         "volume_set": "vol",
         "wake_power_save": False,
     },
+}
+
+# Shown in the config flow. The 16-zone c4.amp profile stays in MODELS for rare probes only.
+SETUP_MODELS = {
+    key: info for key, info in MODELS.items() if key != MODEL_AMP16ZONE
 }

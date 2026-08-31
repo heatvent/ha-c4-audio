@@ -28,7 +28,43 @@ def split_names(value: str | list | None, count: int, prefix: str) -> list[str]:
 
 def enabled_indexes(names: list[str]) -> list[int]:
     """1-based jack indexes that should get Home Assistant entities."""
-    return [index + 1 for index, name in enumerate(names) if name != SKIP_NAME]
+    return [
+        index + 1
+        for index, name in enumerate(names)
+        if name.strip() and name != SKIP_NAME
+    ]
+
+
+def parse_zone_map(
+    raw: dict | list | None,
+    count: int,
+    legacy_lines: str | None = None,
+) -> dict[int, dict[str, str | None]]:
+    """Map physical jack 1..N to {name, area_id}. Empty name means skip entity."""
+    result: dict[int, dict[str, str | None]] = {
+        index: {"name": "", "area_id": None} for index in range(1, count + 1)
+    }
+    if isinstance(raw, dict) and raw:
+        for key, value in raw.items():
+            try:
+                index = int(key)
+            except (TypeError, ValueError):
+                continue
+            if index not in result:
+                continue
+            if isinstance(value, dict):
+                result[index] = {
+                    "name": str(value.get("name") or "").strip(),
+                    "area_id": value.get("area_id") or None,
+                }
+            elif value:
+                result[index]["name"] = str(value).strip()
+        return result
+    if legacy_lines:
+        names = split_names(legacy_lines, count, "Zone")
+        for index, name in enumerate(names, start=1):
+            result[index]["name"] = "" if name == SKIP_NAME else name
+    return result
 
 
 def visible_names(names: list[str]) -> list[str]:

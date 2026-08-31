@@ -9,6 +9,7 @@ from homeassistant.components.media_player import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -49,6 +50,10 @@ class C4ZoneMediaPlayer(CoordinatorEntity[C4AudioCoordinator], MediaPlayerEntity
         switch = self.coordinator.linked_switch()
         if switch is not None:
             self.async_on_remove(switch.async_add_listener(self._handle_switch_update))
+        registry = er.async_get(self.hass)
+        registry.async_update_entity(
+            self.entity_id, area_id=self.coordinator.zone_area_id(self._zone)
+        )
 
     @callback
     def _handle_switch_update(self) -> None:

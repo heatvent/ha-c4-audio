@@ -8,12 +8,11 @@ It talks **UDP 8750** straight to each chassis. It does **not** talk to Director
 
 | Model | Zones / outputs | Inputs | UDP namespace |
 |---|---|---|---|
-| C4-AMP108-1B | 4 stereo | 8 | `c4.amp` |
-| C4-16AMP3-B | 8 stereo | 8 | `c4.amp` |
-| 16-zone amplifier | 16 | 8 | `c4.amp` (second chassis or 16-slot firmware) |
-| AVM-16S1-B / C4-16ZAMSV3-B | 16 line outputs | 16 | `c4.asw` |
+| C4-AMP108-1B | 4 stereo speaker zones | 8 | `c4.amp` |
+| C4-16AMP3-B | 8 stereo speaker zones | 8 | `c4.amp` |
+| C4-16ZAMSV3-B / AVM-16S1-B | 16 line-level outputs | 16 | `c4.asw` (matrix switch, not a speaker amp) |
 
-Add **one integration entry per chassis**. Two 8-zone amps plus a switch is three entries.
+Add **one integration entry per chassis**. A second 8-zone amp is a second amp entry, not a “16-zone amp” model.
 
 ## Install (HACS)
 

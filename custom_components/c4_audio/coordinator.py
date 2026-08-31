@@ -22,6 +22,7 @@ from .const import (
     CONF_SWITCH_FEEDS,
     CONF_UDP_TIMEOUT,
     CONF_ZONE_NAMES,
+    CONF_ZONES,
     DEFAULT_ON_VOLUME,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_SWITCH_FEEDS,
@@ -43,6 +44,7 @@ from .routing import (
     enabled_indexes,
     merged_source_list,
     parse_feeds,
+    parse_zone_map,
     resolve_source_choice,
     split_names,
     visible_names,
@@ -105,12 +107,21 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
         )
 
     @property
-    def zone_names(self) -> list[str]:
-        return split_names(
-            self.entry.options.get(CONF_ZONE_NAMES, self.entry.data.get(CONF_ZONE_NAMES)),
+    def zone_map(self) -> dict[int, dict[str, str | None]]:
+        return parse_zone_map(
+            self.entry.options.get(CONF_ZONES, self.entry.data.get(CONF_ZONES)),
             self.zone_count,
-            "Zone",
+            self.entry.options.get(CONF_ZONE_NAMES, self.entry.data.get(CONF_ZONE_NAMES)),
         )
+
+    @property
+    def zone_names(self) -> list[str]:
+        mapping = self.zone_map
+        return [str(mapping[index]["name"] or "") for index in range(1, self.zone_count + 1)]
+
+    def zone_area_id(self, zone: int) -> str | None:
+        area = self.zone_map.get(zone, {}).get("area_id")
+        return str(area) if area else None
 
     @property
     def source_names(self) -> list[str]:

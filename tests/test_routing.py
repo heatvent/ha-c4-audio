@@ -12,6 +12,7 @@ from routing import (
     enabled_indexes,
     merged_source_list,
     parse_feeds,
+    parse_zone_map,
     resolve_source_choice,
     split_names,
 )
@@ -28,6 +29,14 @@ def test_split_names_keeps_indexes():
 def test_skip_hyphen_zones():
     names = split_names("Kitchen\n-\nPatio", 3, "Zone")
     assert enabled_indexes(names) == [1, 3]
+
+
+def test_empty_zone_name_is_skipped():
+    assert enabled_indexes(["Kitchen", "", "Patio"]) == [1, 3]
+    mapped = parse_zone_map({"1": {"name": "Kitchen"}, "2": {"name": ""}}, 3)
+    assert mapped[1]["name"] == "Kitchen"
+    assert mapped[2]["name"] == ""
+    assert mapped[3]["name"] == ""
 
 
 def test_parse_feeds_default_and_lines():

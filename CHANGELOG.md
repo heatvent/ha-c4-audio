@@ -4,6 +4,10 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 
 HACS shows the GitHub **release tag** (not a git commit hash). Each published version is a GitHub release named `v1.0.0`, `v1.0.1`, and so on.
 
+## [1.0.3]
+
+- Turning a zone on uses the first named input if none is already routed
+
 ## [1.0.2]
 
 - Input/output boxes use a single gray prefix (`Input 1 Name`, `Zone 1 Name`) without a second white label
@@ -26,6 +30,7 @@ First SemVer release (replaces the short integer tags 1–7).
 - Discovery lists only Control4 amps and the 16×16 switch
 - Switch hardware label is C4-16ZAMSV3-B
 
-[1.0.2]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.1...HEAD
+[1.0.3]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/heatvent/ha-c4-audio/releases/tag/v1.0.0

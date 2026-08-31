@@ -32,6 +32,7 @@ from .const import (
     DEFAULT_UDP_TIMEOUT,
     DOMAIN,
     MODELS,
+    SKIP_NAME,
 )
 from .protocol import (
     DeviceCommands,
@@ -204,6 +205,13 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
             return visible_names(self.source_names)
         return merged_source_list(self.source_names, switch.source_names, self.switch_feeds)
 
+    def default_source_index(self) -> int:
+        """Physical jack to use when a zone is turned on with no current route."""
+        for index, name in enumerate(self.source_names, start=1):
+            if name.strip() and name != SKIP_NAME:
+                return index
+        return 1
+
     def media_source_name(self, zone: int) -> str | None:
         amp_input = self.state.zones[zone].source
         switch = self.linked_switch()
@@ -285,7 +293,7 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
 
     async def async_turn_on(self, zone: int) -> None:
         current = self.state.zones[zone]
-        source = current.source or 1
+        source = current.source if current.source > 0 else self.default_source_index()
         volume = self.on_volume
         if self.model.get("wake_power_save"):
             await self.client.async_send(*self.cmds.set_power_save("00"))

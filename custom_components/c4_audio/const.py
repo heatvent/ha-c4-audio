@@ -69,7 +69,7 @@ MODELS = {
         "wake_power_save": False,
     },
     MODEL_MATRIX16: {
-        "name": "C4-16ZAMSV3-B / AVM-16S1-B (16x16 audio switch)",
+        "name": "C4-16ZAMSV3-B (16x16 audio switch)",
         "zones": 16,
         "inputs": 16,
         "kind": "matrix",

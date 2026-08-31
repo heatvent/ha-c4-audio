@@ -25,17 +25,6 @@ AMP_HINTS = (
     "v3_16chanamp",
 )
 SWITCH_HINTS = ("avswitch", "avm-16", "16zams", "16s1")
-SKIP_HINTS = (
-    "ea5",
-    "ea3",
-    "ea1",
-    "controller",
-    "touchscreen",
-    "thermostat",
-    "light",
-    "switcher",
-    "triad_ams",
-)
 
 
 @dataclass(frozen=True)
@@ -69,10 +58,8 @@ def parse_sddp_packet(data: bytes | str, source_ip: str | None = None) -> SddpDe
     sddp_type = headers.get("type", "")
     model_name = headers.get("model", "")
     manufacturer = headers.get("manufacturer", "")
-    blob = f"{sddp_type} {model_name} {ident}".lower()
-    if any(hint in blob for hint in SKIP_HINTS) and not any(
-        hint in blob for hint in AMP_HINTS + SWITCH_HINTS
-    ):
+    suggested = suggest_model(sddp_type, model_name, ident)
+    if suggested is None:
         return None
     return SddpDevice(
         host=ip,
@@ -80,7 +67,7 @@ def parse_sddp_packet(data: bytes | str, source_ip: str | None = None) -> SddpDe
         sddp_type=sddp_type,
         model_name=model_name,
         manufacturer=manufacturer,
-        suggested_model=suggest_model(sddp_type, model_name, ident),
+        suggested_model=suggested,
     )
 
 
@@ -105,12 +92,28 @@ def identity_from_info(info: str | None, fallback: str) -> str:
     return fallback.lower()
 
 
+def _lan_ipv4() -> str:
+    """Address Control4 chassis should unicast SDDP replies to (not 0.0.0.0)."""
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.connect(("8.8.8.8", 80))
+        ip = probe.getsockname()[0]
+        if ip and not ip.startswith("127."):
+            return ip
+    except OSError:
+        pass
+    finally:
+        probe.close()
+    return "0.0.0.0"
+
+
 def _sddp_search_sync(timeout: float) -> list[SddpDevice]:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind(("", 0))
     sock.settimeout(timeout)
-    local_ip, local_port = sock.getsockname()
+    _bound_ip, local_port = sock.getsockname()
+    local_ip = _lan_ipv4()
     payload = f'SEARCH * SDDP/1.0\r\nHost: "{local_ip}:{local_port}"\r\n\r\n'.encode("ascii")
     sock.sendto(payload, (SDDP_MULTICAST, SDDP_PORT))
     found: dict[str, SddpDevice] = {}

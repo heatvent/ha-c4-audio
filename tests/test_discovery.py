@@ -40,6 +40,28 @@ def test_parse_switch_sddp():
     assert device.suggested_model == MODEL_MATRIX16
 
 
+def test_skip_non_c4_audio():
+    sony = (
+        'NOTIFY ALIVE SDDP/1.0\r\n'
+        'From: "192.168.68.98:1902"\r\n'
+        'Host: "str-az1000es"\r\n'
+        'Type: "c4:sony_receiver"\r\n'
+        'Manufacturer: "Sony"\r\n'
+        'Model: "STR-AZ1000ES"\r\n'
+        "\r\n"
+    )
+    wiim = (
+        'NOTIFY ALIVE SDDP/1.0\r\n'
+        'From: "192.168.68.106:1902"\r\n'
+        'Host: "wiim-pro"\r\n'
+        'Type: "c4:wiim"\r\n'
+        'Model: "WiiM Pro"\r\n'
+        "\r\n"
+    )
+    assert parse_sddp_packet(sony) is None
+    assert parse_sddp_packet(wiim) is None
+
+
 def test_skip_ea5():
     packet = (
         'NOTIFY ALIVE SDDP/1.0\r\n'

@@ -13,7 +13,7 @@
       },
       "discover": {
         "title": "Found Control4 audio devices",
-        "description": "These chassis answered SDDP (the same discovery Composer uses). Identity is the device Host/UUID, so DHCP IP changes stay linked.",
+        "description": "Only Control4 amps and the 16×16 switch are listed. Sony, WiiM, and other SDDP gear is ignored. If your chassis is missing, choose Enter IP address manually.",
         "data": {
           "device": "Device"
         }

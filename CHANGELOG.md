@@ -2,6 +2,12 @@
 
 Versions are integers: **1**, **2**, **3**, and so on. Each new release increments by one.
 
+## [5]
+
+- Discovery lists only Control4 amps and the 16×16 switch (not Sony, WiiM, or other SDDP devices)
+- SDDP search advertises the Home Assistant LAN IP so Control4 chassis can reply
+- Switch model label is C4-16ZAMSV3-B
+
 ## [4]
 
 - Restore `CONF_SWITCH_FEEDS` in `const.py` so the integration can import after setup
@@ -24,7 +30,8 @@ Versions are integers: **1**, **2**, **3**, and so on. Each new release incremen
 - Amp↔switch source carry-through
 - Zone/source names, polling, bass/treble, `send_command` / `set_route` / `turn_off_all`
 
-[4]: https://github.com/heatvent/ha-c4-audio/compare/v3...HEAD
+[5]: https://github.com/heatvent/ha-c4-audio/compare/v4...HEAD
+[4]: https://github.com/heatvent/ha-c4-audio/compare/v3...v4
 [3]: https://github.com/heatvent/ha-c4-audio/compare/v2...v3
 [2]: https://github.com/heatvent/ha-c4-audio/compare/v1...v2
 [1]: https://github.com/heatvent/ha-c4-audio/releases/tag/v1

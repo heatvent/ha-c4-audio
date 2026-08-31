@@ -1,6 +1,6 @@
 # Control4 Audio for Home Assistant
 
-Custom HACS integration for Control4 Ethernet **amplifiers** and the **AVM-16S1-B / C4-16ZAMSV3-B** 16×16 audio switch.
+Custom HACS integration for Control4 Ethernet **amplifiers** and the **C4-16ZAMSV3-B** 16×16 audio switch.
 
 It talks **UDP 8750** straight to each chassis. It does **not** talk to Director. If Composer / the Control4 app should stay in charge, do not enable this alongside the official Control4 integration for the same rooms.
 
@@ -10,7 +10,7 @@ It talks **UDP 8750** straight to each chassis. It does **not** talk to Director
 |---|---|---|---|
 | C4-AMP108-1B | 4 stereo speaker zones | 8 | `c4.amp` |
 | C4-16AMP3-B | 8 stereo speaker zones | 8 | `c4.amp` |
-| C4-16ZAMSV3-B / AVM-16S1-B | 16 line-level outputs | 16 | `c4.asw` (matrix switch, not a speaker amp) |
+| C4-16ZAMSV3-B | 16 line-level outputs | 16 | `c4.asw` (matrix switch, not a speaker amp) |
 
 Add **one integration entry per chassis**. A second 8-zone amp is a second amp entry, not a “16-zone amp” model.
 

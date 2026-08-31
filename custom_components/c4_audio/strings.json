@@ -1,0 +1,60 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Control4 Audio",
+        "description": "Add one amplifier or matrix switch. Repeat this flow for each additional chassis.",
+        "data": {
+          "name": "Name",
+          "host": "IP address",
+          "port": "UDP port",
+          "model": "Hardware"
+        }
+      },
+      "names": {
+        "title": "Zones and sources",
+        "description": "One name per line, physical jack 1 at the top. Put a single hyphen on a line to skip that jack (no entity).",
+        "data": {
+          "zone_names": "Zone / output names",
+          "source_names": "Input names",
+          "on_volume": "Power-on volume (%)",
+          "poll_interval": "Status poll interval (seconds)",
+          "udp_timeout": "UDP timeout (seconds)",
+          "enable_eq": "Show bass and treble sliders"
+        }
+      },
+      "link": {
+        "title": "Matrix switch carry-through",
+        "description": "If this amp is fed by a Control4 audio switch, link it. Feeds are amp_input=switch_output (default 1=1 means amp input 1 is switch output 1). Selecting WiiM on a room then routes the switch and the amp together.",
+        "data": {
+          "switch_entry_id": "Matrix switch",
+          "switch_feeds": "Amp input = switch output"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "No UDP reply on port 8750. Check the IP and that Director is not blocking the chassis."
+    },
+    "abort": {
+      "already_configured": "That IP address is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Zone and source names",
+        "description": "Editing {model}. One name per line. Hyphen skips a jack. Link a switch so amp rooms show matrix sources.",
+        "data": {
+          "zone_names": "Zone / output names",
+          "source_names": "Input names",
+          "on_volume": "Power-on volume (%)",
+          "poll_interval": "Status poll interval (seconds)",
+          "udp_timeout": "UDP timeout (seconds)",
+          "enable_eq": "Show bass and treble sliders",
+          "switch_entry_id": "Matrix switch",
+          "switch_feeds": "Amp input = switch output"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,48 @@
+send_command:
+  name: Send UDP command
+  description: Send a raw Control4 serial-over-UDP body (c4.amp.* or c4.asw.*).
+  fields:
+    command:
+      required: true
+      example: "c4.amp.out 01 03"
+      selector:
+        text:
+    host:
+      required: false
+      example: "192.168.68.93"
+      selector:
+        text:
+
+set_route:
+  name: Set route
+  description: Route one output/zone to an input (0 disconnects). Uses c4.amp.out or c4.asw.out for that chassis.
+  fields:
+    output:
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 16
+    input:
+      required: true
+      example: 4
+      selector:
+        number:
+          min: 0
+          max: 16
+    host:
+      required: false
+      example: "192.168.68.80"
+      selector:
+        text:
+
+turn_off_all:
+  name: Turn off all zones
+  description: Mute and disconnect every enabled zone on a chassis (or every chassis if host is omitted).
+  fields:
+    host:
+      required: false
+      example: "192.168.68.93"
+      selector:
+        text:

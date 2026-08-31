@@ -1,0 +1,12 @@
+{
+  "entity": {
+    "media_player": {
+      "zone": {
+        "default": "mdi:speaker",
+        "state": {
+          "off": "mdi:speaker-off"
+        }
+      }
+    }
+  }
+}

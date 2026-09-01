@@ -42,6 +42,19 @@ If WiiM (and anything else) are wired **straight into the amp**, skip the switch
 
 Each chassis is polled about every **15 seconds** (configurable 5–300): firmware, routes (`ain`), volume, mute, and bass/treble when EQ sliders are on. After a SET, the integration immediately re-reads that chassis (and the linked switch) so Home Assistant matches the hardware. Unsolicited `0t` status frames are applied when the amp/switch sends them.
 
+Each chassis also has a diagnostic **UDP activity** sensor. It lists SET commands, their replies, and unsolicited status (not the 15-second GET polls). Example card:
+
+```yaml
+type: markdown
+title: Amp UDP
+content: |
+  ```
+  {{ state_attr('sensor.media_closet_control4_amp_udp_activity', 'activity') }}
+  ```
+```
+
+Fix the entity ID to match Settings → Devices → your amp → UDP activity.
+
 ## Controls (confirmed UDP)
 
 **Amp (`c4.amp`)**

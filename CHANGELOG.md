@@ -4,6 +4,10 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 
 HACS shows the GitHub **release tag** (not a git commit hash). Each published version is a GitHub release named `v1.0.0`, `v1.0.1`, and so on.
 
+## [1.0.6]
+
+- Amp and switch devices expose a **UDP activity** sensor (SET commands, replies, and unsolicited `0t` frames). Polling GETs stay in debug logs. Put it on a dashboard with a markdown card on `state_attr('sensor.…_udp_activity', 'activity')`.
+
 ## [1.0.5]
 
 - Amp zones turn on at 10% (not the leftover 100% from `chvolmax`). Change it under Configure → Settings → Turn-on volume.
@@ -43,6 +47,7 @@ First SemVer release (replaces the short integer tags 1–7).
 - Discovery lists only Control4 amps and the 16×16 switch
 - Switch hardware label is C4-16ZAMSV3-B
 
+[1.0.6]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.2...v1.0.4
 [1.0.3]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.2...v1.0.3

@@ -191,6 +191,11 @@
       "source": {
         "name": "Source"
       }
+    },
+    "sensor": {
+      "udp_activity": {
+        "name": "UDP activity"
+      }
     }
   },
   "services": {

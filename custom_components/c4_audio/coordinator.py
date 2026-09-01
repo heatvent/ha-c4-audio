@@ -106,6 +106,7 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
         self.is_matrix = self.model.get("kind") == "matrix"
         self.client = C4UdpClient(entry.data[CONF_HOST], int(entry.data[CONF_PORT]), timeout)
         self.client.add_listener(self._on_packet)
+        self.client.add_activity_listener(self._on_udp_activity)
         self.state = DeviceState(
             zones={index: ZoneState() for index in range(1, self.zone_count + 1)}
         )
@@ -415,6 +416,10 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
             if value is None:
                 continue
             self.state.zones[index].treble = hex_to_signed_gain(f"{value:02x}")
+
+    @callback
+    def _on_udp_activity(self) -> None:
+        self.hass.loop.call_soon_threadsafe(self.async_set_updated_data, self.state)
 
     @callback
     def _on_packet(self, packet: ParsedPacket) -> None:

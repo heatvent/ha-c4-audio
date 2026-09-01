@@ -12,6 +12,11 @@
       "source": {
         "default": "mdi:import"
       }
+    },
+    "sensor": {
+      "udp_activity": {
+        "default": "mdi:console-line"
+      }
     }
   }
 }

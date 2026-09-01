@@ -26,6 +26,7 @@ async def async_get_config_entry_diagnostics(
             CONF_SWITCH_ENTRY_ID, coordinator.entry.data.get(CONF_SWITCH_ENTRY_ID)
         ),
         "switch_feeds": coordinator.switch_feeds,
+        "udp_activity": coordinator.client.activity_lines,
         "zones": {
             str(index): {
                 "name": coordinator.zone_names[index - 1],

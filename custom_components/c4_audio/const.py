@@ -1,7 +1,7 @@
 """Constants for the Control4 Audio integration."""
 
 DOMAIN = "c4_audio"
-PLATFORMS = ["media_player", "number", "select", "sensor"]
+PLATFORMS = ["media_player", "number", "select", "sensor", "switch", "button"]
 
 DEFAULT_PORT = 8750
 DEFAULT_POLL_INTERVAL = 15

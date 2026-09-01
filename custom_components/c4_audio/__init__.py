@@ -21,6 +21,7 @@ _LOGGER = logging.getLogger(__name__)
 SERVICE_SEND_COMMAND = "send_command"
 SERVICE_SET_ROUTE = "set_route"
 SERVICE_TURN_OFF_ALL = "turn_off_all"
+SERVICE_TURN_ON_ALL = "turn_on_all"
 ATTR_COMMAND = "command"
 ATTR_OUTPUT = "output"
 ATTR_INPUT = "input"
@@ -63,7 +64,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator: C4AudioCoordinator = hass.data[DOMAIN].pop(entry.entry_id)
     await coordinator.async_shutdown()
     if unload_ok and not hass.data[DOMAIN]:
-        for service in (SERVICE_SEND_COMMAND, SERVICE_SET_ROUTE, SERVICE_TURN_OFF_ALL):
+        for service in (SERVICE_SEND_COMMAND, SERVICE_SET_ROUTE, SERVICE_TURN_OFF_ALL, SERVICE_TURN_ON_ALL):
             hass.services.async_remove(DOMAIN, service)
     return unload_ok
 
@@ -97,6 +98,14 @@ def _register_services(hass: HomeAssistant) -> None:
         for coordinator in matched:
             await coordinator.async_turn_off_all()
 
+    async def handle_turn_on_all(call: ServiceCall) -> None:
+        matched = _match(hass, call.data.get(CONF_HOST))
+        if not matched:
+            _LOGGER.error("No Control4 Audio device matched for turn_on_all")
+            return
+        for coordinator in matched:
+            await coordinator.async_turn_on_all()
+
     hass.services.async_register(
         DOMAIN,
         SERVICE_SEND_COMMAND,
@@ -124,6 +133,12 @@ def _register_services(hass: HomeAssistant) -> None:
         DOMAIN,
         SERVICE_TURN_OFF_ALL,
         handle_turn_off_all,
+        schema=vol.Schema({vol.Optional(CONF_HOST): cv.string}),
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_TURN_ON_ALL,
+        handle_turn_on_all,
         schema=vol.Schema({vol.Optional(CONF_HOST): cv.string}),
     )
 

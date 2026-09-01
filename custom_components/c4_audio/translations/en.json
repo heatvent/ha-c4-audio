@@ -196,6 +196,19 @@
       "udp_activity": {
         "name": "UDP activity"
       }
+    },
+    "switch": {
+      "all_zones": {
+        "name": "All zones"
+      }
+    },
+    "button": {
+      "all_on": {
+        "name": "All on"
+      },
+      "all_off": {
+        "name": "All off"
+      }
     }
   },
   "services": {
@@ -210,6 +223,10 @@
     "turn_off_all": {
       "name": "Turn off all zones",
       "description": "Mute and disconnect enabled zones."
+    },
+    "turn_on_all": {
+      "name": "Turn on all zones",
+      "description": "Turn on every enabled zone at the turn-on volume."
     }
   }
 }

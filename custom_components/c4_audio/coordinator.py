@@ -297,7 +297,7 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
         self.state.zones[zone].source = source
         self.async_set_updated_data(self.state)
 
-    async def async_turn_on(self, zone: int) -> None:
+    async def async_turn_on(self, zone: int, *, confirm: bool = True) -> None:
         current = self.state.zones[zone]
         source = current.source if current.source > 0 else self.default_source_index()
         volume = self.on_volume
@@ -312,6 +312,12 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
             await self.client.async_send(*self.cmds.set_mute(zone, False))
             current.muted = False
         self.async_set_updated_data(self.state)
+        if confirm:
+            await self._async_confirm()
+
+    async def async_turn_on_all(self) -> None:
+        for zone in self.enabled_zones:
+            await self.async_turn_on(zone, confirm=False)
         await self._async_confirm()
 
     async def async_turn_off(self, zone: int, *, confirm: bool = True) -> None:

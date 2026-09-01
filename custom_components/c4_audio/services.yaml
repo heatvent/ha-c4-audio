@@ -46,3 +46,13 @@ turn_off_all:
       example: "192.168.68.93"
       selector:
         text:
+
+turn_on_all:
+  name: Turn on all zones
+  description: Turn on every enabled zone at the turn-on volume (or every chassis if host is omitted).
+  fields:
+    host:
+      required: false
+      example: "192.168.68.93"
+      selector:
+        text:

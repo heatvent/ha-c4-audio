@@ -14,7 +14,7 @@ from .protocol import ParsedPacket, build_frame, next_sequence, parse_packet
 
 _LOGGER = logging.getLogger(__name__)
 
-ACTIVITY_MAX = 40
+ACTIVITY_MAX = 20
 
 
 def _ascii_frame(data: bytes | str) -> str:

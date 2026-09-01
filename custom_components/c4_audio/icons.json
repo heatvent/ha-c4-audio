@@ -17,6 +17,19 @@
       "udp_activity": {
         "default": "mdi:console-line"
       }
+    },
+    "switch": {
+      "all_zones": {
+        "default": "mdi:speaker-multiple"
+      }
+    },
+    "button": {
+      "all_on": {
+        "default": "mdi:play-circle"
+      },
+      "all_off": {
+        "default": "mdi:stop-circle-outline"
+      }
     }
   }
 }

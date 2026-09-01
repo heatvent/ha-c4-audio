@@ -4,6 +4,11 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 
 HACS shows the GitHub **release tag** (not a git commit hash). Each published version is a GitHub release named `v1.0.0`, `v1.0.1`, and so on.
 
+## [1.0.5]
+
+- Amp zones turn on at 10% (not the leftover 100% from `chvolmax`). Change it under Configure → Settings → Turn-on volume.
+- Set volume after the zone is routed and still muted; 16AMP3 ignores `chvol` while disconnected.
+
 ## [1.0.4]
 
 - Do not send `chvolmax` when a zone turns off (16AMP3 firmware jumps live volume to 100%)
@@ -38,6 +43,7 @@ First SemVer release (replaces the short integer tags 1–7).
 - Discovery lists only Control4 amps and the 16×16 switch
 - Switch hardware label is C4-16ZAMSV3-B
 
+[1.0.5]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.2...v1.0.4
 [1.0.3]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.1...v1.0.2

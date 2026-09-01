@@ -160,7 +160,7 @@
       },
       "settings": {
         "title": "Settings",
-        "description": "Amp default turn-on volume is 15% so rooms do not come on loud. Maximum volume is the Composer volume limit. The switch stays at 100%.",
+        "description": "Amp default turn-on volume is 10% so rooms do not come on loud. Maximum volume is a software cap. The switch stays at 100%.",
         "data": {
           "on_volume": "Turn-on volume (%)",
           "max_volume": "Maximum volume (%)",

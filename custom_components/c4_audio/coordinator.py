@@ -150,15 +150,11 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
 
     @property
     def on_volume(self) -> int:
-        default = DEFAULT_SWITCH_ON_VOLUME if self.is_matrix else DEFAULT_ON_VOLUME
-        return clamp_volume(
-            int(
-                self.entry.options.get(
-                    CONF_ON_VOLUME, self.entry.data.get(CONF_ON_VOLUME, default)
-                )
-            ),
-            self.max_volume,
-        )
+        if self.is_matrix:
+            return DEFAULT_SWITCH_ON_VOLUME
+        if CONF_ON_VOLUME in self.entry.options:
+            return clamp_volume(int(self.entry.options[CONF_ON_VOLUME]), self.max_volume)
+        return DEFAULT_ON_VOLUME
 
     @property
     def max_volume(self) -> int:
@@ -290,11 +286,11 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
             await self.async_route_output(zone, amp_input)
         await self._async_confirm()
 
-    async def async_route_output(self, zone: int, source: int) -> None:
+    async def async_route_output(self, zone: int, source: int, *, unmute: bool = True) -> None:
         if not self.is_matrix and source > 0:
             await self.client.async_send(*self.cmds.get_digital(source))
         await self.client.async_send(*self.cmds.set_output(zone, source))
-        if source > 0:
+        if source > 0 and unmute:
             await self.client.async_send(*self.cmds.set_mute(zone, False))
             self.state.zones[zone].muted = False
         self.state.zones[zone].source = source
@@ -303,14 +299,18 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
     async def async_turn_on(self, zone: int) -> None:
         current = self.state.zones[zone]
         source = current.source if current.source > 0 else self.default_source_index()
-        volume = current.volume if current.volume > 0 else self.on_volume
-        volume = clamp_volume(volume, self.max_volume)
+        volume = self.on_volume
         if self.model.get("wake_power_save"):
             await self.client.async_send(*self.cmds.set_power_save("00"))
-        # Set level while muted/disconnected so unmute is not a 100% blip.
+        # Connect muted, set turn-on volume, then unmute. chvol while disconnected
+        # is ignored on 16AMP3, which left the leftover 100% from chvolmax.
+        await self.async_route_output(zone, source, unmute=False)
         await self.client.async_send(*self.cmds.set_volume(zone, volume))
         current.volume = volume
-        await self.async_route_output(zone, source)
+        if source > 0:
+            await self.client.async_send(*self.cmds.set_mute(zone, False))
+            current.muted = False
+        self.async_set_updated_data(self.state)
         await self._async_confirm()
 
     async def async_turn_off(self, zone: int, *, confirm: bool = True) -> None:

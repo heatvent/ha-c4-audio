@@ -77,6 +77,16 @@ def clamp_volume(percent: int, max_volume: int) -> int:
     return max(0, min(cap, int(percent)))
 
 
+def ha_volume_to_percent(volume: float, *, as_percent: bool = False) -> int:
+    """Map a Home Assistant slider (0–1) or a 0–100 step to percent.
+
+    Slider 1.0 is 100%. Integer 1 from volume_up must stay 1%, not 100%.
+    """
+    if as_percent or volume > 1:
+        return int(round(volume))
+    return int(round(float(volume) * 100))
+
+
 def parse_feeds(text: str | None) -> dict[int, int]:
     """Parse `amp_input=switch_output` lines. Default bus is amp in 1 ← switch out 1."""
     feeds: dict[int, int] = {}

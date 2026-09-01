@@ -39,7 +39,7 @@ set_route:
 
 turn_off_all:
   name: Turn off all zones
-  description: Mute and disconnect every enabled zone on a chassis (or every chassis if host is omitted).
+  description: Mute and disconnect every enabled amp zone. Pass host to target one chassis (amp or switch). Without host, only amplifiers are changed.
   fields:
     host:
       required: false
@@ -49,7 +49,7 @@ turn_off_all:
 
 turn_on_all:
   name: Turn on all zones
-  description: Turn on every enabled zone at the turn-on volume (or every chassis if host is omitted).
+  description: Turn on every enabled amp zone that is off (already-on rooms keep their volume). Pass host to target one chassis. Without host, only amplifiers are changed.
   fields:
     host:
       required: false

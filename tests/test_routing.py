@@ -9,6 +9,7 @@ from routing import (
     KIND_LOCAL,
     KIND_SWITCH,
     clamp_volume,
+    ha_volume_to_percent,
     displayed_amp_source,
     enabled_indexes,
     merged_source_list,
@@ -37,6 +38,15 @@ def test_clamp_volume_respects_software_cap():
     assert clamp_volume(10, 40) == 10
     assert clamp_volume(-5, 100) == 0
     assert clamp_volume(120, 100) == 100
+
+
+def test_ha_volume_slider_vs_percent_step():
+    assert ha_volume_to_percent(1.0) == 100
+    assert ha_volume_to_percent(0.1) == 10
+    assert ha_volume_to_percent(1, as_percent=True) == 1
+    assert ha_volume_to_percent(0, as_percent=True) == 0
+    assert ha_volume_to_percent(12, as_percent=True) == 12
+    assert ha_volume_to_percent(12) == 12
 
 
 def test_empty_zone_name_is_skipped():

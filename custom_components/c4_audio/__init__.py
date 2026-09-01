@@ -31,10 +31,12 @@ def _coordinators(hass: HomeAssistant) -> list[C4AudioCoordinator]:
     return list(hass.data.get(DOMAIN, {}).values())
 
 
-def _match(hass: HomeAssistant, host: str | None) -> list[C4AudioCoordinator]:
+def _match(hass: HomeAssistant, host: str | None, *, amps_only: bool = False) -> list[C4AudioCoordinator]:
     items = _coordinators(hass)
     if host:
         items = [item for item in items if item.host == host]
+    elif amps_only:
+        items = [item for item in items if not item.is_matrix]
     return items
 
 
@@ -91,7 +93,7 @@ def _register_services(hass: HomeAssistant) -> None:
         await matched[0].async_request_refresh()
 
     async def handle_turn_off_all(call: ServiceCall) -> None:
-        matched = _match(hass, call.data.get(CONF_HOST))
+        matched = _match(hass, call.data.get(CONF_HOST), amps_only=True)
         if not matched:
             _LOGGER.error("No Control4 Audio device matched for turn_off_all")
             return
@@ -99,7 +101,7 @@ def _register_services(hass: HomeAssistant) -> None:
             await coordinator.async_turn_off_all()
 
     async def handle_turn_on_all(call: ServiceCall) -> None:
-        matched = _match(hass, call.data.get(CONF_HOST))
+        matched = _match(hass, call.data.get(CONF_HOST), amps_only=True)
         if not matched:
             _LOGGER.error("No Control4 Audio device matched for turn_on_all")
             return

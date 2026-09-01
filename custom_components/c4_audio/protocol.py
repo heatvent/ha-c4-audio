@@ -77,6 +77,51 @@ def next_sequence(current: int) -> int:
     return (current + 1) & 0xFFFF
 
 
+def split_user_command(text: str) -> tuple[str, str]:
+    """Turn a Developer Tools body into (0s|0g, command without sequence)."""
+    stripped = text.strip()
+    if stripped.startswith(("0s", "0g")):
+        prefix = stripped[:2]
+        rest = stripped[2:].lstrip()
+        parts = rest.split(None, 1)
+        if (
+            parts
+            and len(parts[0]) == 4
+            and all(char in "0123456789abcdefABCDEF" for char in parts[0])
+        ):
+            body = parts[1] if len(parts) > 1 else ""
+        else:
+            body = rest
+        return prefix, body
+
+    get_bodies = {
+        "c4.sy.fwv",
+        "c4.sy.info",
+        "c4.amp.ain",
+        "c4.amp.avol",
+        "c4.amp.amut",
+        "c4.amp.psave",
+        "c4.amp.abss",
+        "c4.amp.atrb",
+        "c4.amp.abal",
+        "c4.asw.ain",
+        "c4.asw.avol",
+        "c4.asw.amut",
+        "c4.asw.abss",
+        "c4.asw.atrb",
+        "c4.asw.abal",
+    }
+    prefix = (
+        "0g"
+        if stripped in get_bodies
+        or stripped.startswith(("c4.amp.digi", "c4.asw.ain", "c4.asw.avol", "c4.asw.amut"))
+        else "0s"
+    )
+    if " " not in stripped and stripped.startswith("c4."):
+        prefix = "0g"
+    return prefix, stripped
+
+
 @dataclass(slots=True)
 class ParsedPacket:
     kind: str  # "reply" | "status" | "other"

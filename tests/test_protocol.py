@@ -10,6 +10,7 @@ from protocol import (
     DeviceCommands,
     build_frame,
     parse_packet,
+    split_user_command,
     volume_hex_to_percent,
     volume_percent_to_hex,
 )
@@ -53,6 +54,14 @@ def test_switch_namespace_and_unity_volume():
     _prefix, vol = cmds.set_volume(1, 100)
     assert vol == "c4.asw.vol 01 64"
     assert cmds.decode_volume("64") == 100
+
+
+def test_split_user_command_get_vs_set():
+    assert split_user_command("c4.amp.avol") == ("0g", "c4.amp.avol")
+    assert split_user_command("0g c4.amp.avol") == ("0g", "c4.amp.avol")
+    assert split_user_command("0g630b c4.amp.avol") == ("0g", "c4.amp.avol")
+    assert split_user_command("c4.amp.out 02 01") == ("0s", "c4.amp.out 02 01")
+    assert split_user_command("0s c4.amp.mute 02 00") == ("0s", "c4.amp.mute 02 00")
 
 
 def test_amp_volume_limit_command():

@@ -13,8 +13,15 @@ After 1.0.6, add a live UDP log (entity ID from the amp device page):
 ```yaml
 type: markdown
 title: Amp UDP
+card_mod:
+  style: |
+    ha-card {
+      max-height: 12em;
+      overflow-y: auto;
+    }
 content: |
+  {% set log = state_attr('sensor.media_closet_control4_amp_udp_activity', 'activity') %}
   ```
-  {{ state_attr('sensor.media_closet_control4_amp_udp_activity', 'activity') }}
+  {% if log %}{{ log.split('\n')[-20:] | join('\n') }}{% else %}idle{% endif %}
   ```
 ```

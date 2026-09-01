@@ -4,6 +4,17 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 
 HACS shows the GitHub **release tag** (not a git commit hash). Each published version is a GitHub release named `v1.0.0`, `v1.0.1`, and so on.
 
+## [1.0.8]
+
+- Volume-up from 0% no longer jumps to 100% (slider 0–1 vs 1% step)
+- Selecting a source on an off zone uses the 10% turn-on volume before unmute
+- All on leaves rooms that are already playing at their current volume
+- Ignore a stale 100% volume poll for a couple of seconds after we write `chvol`
+- Off zones report turn-on volume on the slider so Lovelace does not send 100%
+- `turn_on_all` / `turn_off_all` without `host` only target amps, not the matrix switch
+- Raw UDP helper no longer wraps GET frames as SET
+- UDP activity lines are debug-level; area IDs are only written when they change
+
 ## [1.0.7]
 
 - Each amp and switch has **All on** / **All off** buttons and an **All zones** switch (on if any named zone is on). Use those in automations or expose the switch to Alexa. Services `c4_audio.turn_on_all` and `c4_audio.turn_off_all` do the same.
@@ -51,6 +62,7 @@ First SemVer release (replaces the short integer tags 1–7).
 - Discovery lists only Control4 amps and the 16×16 switch
 - Switch hardware label is C4-16ZAMSV3-B
 
+[1.0.8]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.4...v1.0.5

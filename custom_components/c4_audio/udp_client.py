@@ -75,7 +75,7 @@ class C4UdpClient:
     def _note(self, line: str, *, noisy: bool) -> None:
         if noisy:
             self._activity.append(line)
-            _LOGGER.info("%s", line)
+            _LOGGER.debug("%s", line)
             for callback in self._activity_listeners:
                 try:
                     callback()

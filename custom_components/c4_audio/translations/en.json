@@ -222,11 +222,11 @@
     },
     "turn_off_all": {
       "name": "Turn off all zones",
-      "description": "Mute and disconnect enabled zones."
+      "description": "Mute and disconnect enabled amp zones. Without host, only amplifiers are changed."
     },
     "turn_on_all": {
       "name": "Turn on all zones",
-      "description": "Turn on every enabled zone at the turn-on volume."
+      "description": "Turn on enabled amp zones that are off. Already-on rooms keep volume. Without host, only amplifiers are changed."
     }
   }
 }

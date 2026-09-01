@@ -78,7 +78,7 @@ Fix the entity ID to match Settings → Devices → your amp → UDP activity.
 - Mute; line volume `vol` (`64` = 100 = unity)
 - Poll: `ain` (and volume/mute when the firmware answers)
 
-**Services:** `c4_audio.send_command`, `c4_audio.set_route`, `c4_audio.turn_on_all`, `c4_audio.turn_off_all`.
+**Services:** `c4_audio.send_command`, `c4_audio.set_route`, `c4_audio.turn_on_all`, `c4_audio.turn_off_all`. Without `host`, All on/off only touch **amps**. Pass the switch IP to change named switch outputs.
 
 Each chassis also has **All on** / **All off** buttons and an **All zones** switch. Expose **All zones** to Alexa (Nabu Casa → Alexa → expose entities). Automations can call the switch, the buttons, or the services without listing every room.
 

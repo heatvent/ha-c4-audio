@@ -1,0 +1,37 @@
+# Paste under `script:` in configuration.yaml, or create two scripts in the UI.
+# Source name must match the Control4 Audio input name (e.g. "WiiM Pro").
+
+whole_home_music_on:
+  alias: Whole-home music on
+  icon: mdi:music
+  mode: single
+  sequence:
+    - action: media_player.select_source
+      target:
+        entity_id:
+          - media_player.kitchen
+          - media_player.dining
+          - media_player.patio
+          - media_player.master_br
+          - media_player.master_bath
+          - media_player.bar
+          - media_player.garage
+      data:
+        source: WiiM Pro
+    - action: media_player.volume_set
+      target:
+        entity_id:
+          - media_player.wiim_pro
+      data:
+        volume_level: 1.0
+
+whole_home_music_off:
+  alias: Whole-home music off
+  icon: mdi:music-off
+  mode: single
+  sequence:
+    - action: c4_audio.turn_off_all
+    - action: media_player.turn_off
+      target:
+        entity_id:
+          - media_player.wiim_pro

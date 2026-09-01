@@ -205,25 +205,34 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
             return visible_names(self.source_names)
         return merged_source_list(self.source_names, switch.source_names, self.switch_feeds)
 
+    def media_source_name(self, zone: int) -> str | None:
+        current = self.state.zones[zone].source
+        if self.is_matrix:
+            if current <= 0:
+                return None
+            names = self.source_names
+            if current <= len(names):
+                name = names[current - 1]
+                if name != SKIP_NAME:
+                    return name
+            return f"Input {current}"
+        switch = self.linked_switch()
+        switch_input = None
+        switch_names = None
+        if switch is not None and current in self.switch_feeds:
+            switch_output = self.switch_feeds[current]
+            switch_input = switch.state.zones.get(switch_output, ZoneState()).source
+            switch_names = switch.source_names
+        return displayed_amp_source(
+            current, self.source_names, self.switch_feeds, switch_input, switch_names
+        )
+
     def default_source_index(self) -> int:
         """Physical jack to use when a zone is turned on with no current route."""
         for index, name in enumerate(self.source_names, start=1):
             if name.strip() and name != SKIP_NAME:
                 return index
         return 1
-
-    def media_source_name(self, zone: int) -> str | None:
-        amp_input = self.state.zones[zone].source
-        switch = self.linked_switch()
-        switch_input = None
-        switch_names = None
-        if switch is not None and amp_input in self.switch_feeds:
-            switch_output = self.switch_feeds[amp_input]
-            switch_input = switch.state.zones.get(switch_output, ZoneState()).source
-            switch_names = switch.source_names
-        return displayed_amp_source(
-            amp_input, self.source_names, self.switch_feeds, switch_input, switch_names
-        )
 
     def zone_is_on(self, zone: int) -> bool:
         return self.state.zones[zone].source > 0
@@ -294,21 +303,20 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
     async def async_turn_on(self, zone: int) -> None:
         current = self.state.zones[zone]
         source = current.source if current.source > 0 else self.default_source_index()
-        volume = self.on_volume
+        volume = current.volume if current.volume > 0 else self.on_volume
+        volume = clamp_volume(volume, self.max_volume)
         if self.model.get("wake_power_save"):
             await self.client.async_send(*self.cmds.set_power_save("00"))
-        await self.async_route_output(zone, source)
+        # Set level while muted/disconnected so unmute is not a 100% blip.
         await self.client.async_send(*self.cmds.set_volume(zone, volume))
         current.volume = volume
-        self.async_set_updated_data(self.state)
+        await self.async_route_output(zone, source)
         await self._async_confirm()
 
     async def async_turn_off(self, zone: int, *, confirm: bool = True) -> None:
         await self.client.async_send(*self.cmds.set_mute(zone, True))
         await self.client.async_send(*self.cmds.set_output(zone, 0))
-        if not self.is_matrix:
-            # Composer volume limit. Firmware jumps live level if this is sent while playing.
-            await self.client.async_send(*self.cmds.set_volume_max(zone, self.max_volume))
+        # Never send chvolmax here. 16AMP3 firmware snaps live volume to the cap.
         self.state.zones[zone].source = 0
         self.state.zones[zone].muted = True
         self.async_set_updated_data(self.state)

@@ -14,6 +14,8 @@ It talks **UDP 8750** straight to each chassis. It does **not** talk to Director
 
 Add **one integration entry per chassis**. A second 8-zone amp is a second amp entry, not a “16-zone amp” model.
 
+**Whole-home music (no AVRs on this path):** add the **C4-16AMP3-B** and put sources on its analog inputs (WiiM analog out is enough). Leave unused amp zones unnamed. The 16×16 switch is optional — only add it if several line-level sources still share one amp input. Leave switch outputs that used to feed receivers unnamed so they never become `media_player`s. Living room / basement ceilings stay off this integration unless you land those speakers on spare amp zones (the 16AMP3 has eight).
+
 ## Install (HACS)
 
 1. HACS → Integrations → Custom repositories → `https://github.com/heatvent/ha-c4-audio`, category **Integration**.
@@ -28,18 +30,13 @@ Releases and version history: [CHANGELOG.md](CHANGELOG.md).
 
 1. Add Integration → **Control4 Audio**. Pick the chassis (or enter IP) and the hardware type.
 2. **Inputs:** one name box per jack. Leave a box empty to skip that input.
-3. **Outputs:** one name box and a room dropdown per jack. Leave a name empty to skip that output.
-4. Volume, polling, UDP timeout, bass/treble, and amp↔switch link stay at defaults. Change them later under **Configure** if needed.
+3. **Amp outputs:** one name box and a room dropdown per zone. Leave a name empty to skip that zone.
+4. **Switch outputs:** name boxes labeled as Output 1, Output 2, … with no room picker. Named outputs stay in the same area as the switch.
+5. Volume, polling, UDP timeout, bass/treble, and amp↔switch link stay at defaults. Change them later under **Configure** if needed.
 
-Add the **switch** first if you have one, then each **amp**. On the amp, **Configure → Settings** to link the switch. Default feed `1=1` means amp input 1 is fed by switch output 1.
+Named outputs and zones are `media_player`s. Each also gets a **Source** dropdown on the same Home Assistant device so you can pick an input from the device page without opening more-info. Name the inputs in setup or those lists stay empty.
 
-Selecting **WiiM Pro** on Kitchen sends:
-
-1. `c4.asw.out {switch output} {WiiM input}`
-2. `c4.amp.out {kitchen zone} {amp input on that bus}`
-3. unmute on both as needed
-
-Every amp zone on the same bus hears the same matrix source. That is how the analog wiring works.
+If WiiM (and anything else) are wired **straight into the amp**, skip the switch entry and the link. Selecting WiiM only sends `c4.amp.out` to that amp input. Every zone you route to the same amp jack hears the same analog source — that is the wiring, not a software mix.
 
 ## Status polling
 
@@ -50,7 +47,7 @@ Each chassis is polled about every **15 seconds** (configurable 5–300): firmwa
 **Amp (`c4.amp`)**
 
 - Route / power: `out`, mute `00`/`01`
-- Volume: `chvol` (percent + 155). Step ±1% in the UI. Turn-on volume is that same `chvol` when a zone turns on. Max volume is Composer’s volume limit (`chvolmax`); it is only written when the zone is off because SET while playing jumps the live level. Do not use `chvolmax` as a slider.
+- Volume: `chvol` (percent + 155). Step ±1% in the UI. Max volume is a software cap on the slider. Do **not** send `chvolmax` (firmware snaps live level to the cap).
 - Tone: `bassgain` / `trebgain` as number entities
 - Poll: `ain`, `avol`, `amut`, `abss`, `atrb`, `c4.sy.fwv`
 - `psave` only on AMP108 (16AMP3 returns `n01`)
@@ -62,5 +59,7 @@ Each chassis is polled about every **15 seconds** (configurable 5–300): firmwa
 - Poll: `ain` (and volume/mute when the firmware answers)
 
 **Services:** `c4_audio.send_command`, `c4_audio.set_route`, `c4_audio.turn_off_all`.
+
+Example Home Assistant Music dashboard (WiiM + amp zones): [examples/ha-dashboard](examples/ha-dashboard).
 
 Protocol details: [PROTOCOL.md](PROTOCOL.md). Probe tools: [tools/README.md](tools/README.md).

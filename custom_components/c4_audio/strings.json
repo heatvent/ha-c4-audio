@@ -20,7 +20,7 @@
       },
       "inputs": {
         "title": "Name inputs",
-        "description": "You are naming INPUT jacks. Leave a box empty to skip that input.",
+        "description": "You are naming INPUT jacks. Leave a box empty to skip that input. Named inputs become the source list on each amp zone or switch output.",
         "data": {
           "input_1_name": " ",
           "input_2_name": " ",
@@ -42,7 +42,7 @@
       },
       "outputs": {
         "title": "Name outputs",
-        "description": "You are naming OUTPUT jacks (zones). Leave a name empty to skip that output. Choose a room for each named zone.",
+        "description": "You are naming {output_kind}. Leave a name empty to skip that output. {area_help}",
         "data": {
           "zone_1_name": " ",
           "zone_1_area": " ",
@@ -100,7 +100,7 @@
       },
       "inputs": {
         "title": "Name inputs",
-        "description": "You are naming INPUT jacks. Leave a box empty to skip that input.",
+        "description": "You are naming INPUT jacks. Leave a box empty to skip that input. Named inputs become the source list on each amp zone or switch output.",
         "data": {
           "input_1_name": " ",
           "input_2_name": " ",
@@ -122,7 +122,7 @@
       },
       "outputs": {
         "title": "Name outputs",
-        "description": "You are naming OUTPUT jacks (zones). Leave a name empty to skip that output. Choose a room for each named zone.",
+        "description": "You are naming {output_kind}. Leave a name empty to skip that output. {area_help}",
         "data": {
           "zone_1_name": " ",
           "zone_1_area": " ",

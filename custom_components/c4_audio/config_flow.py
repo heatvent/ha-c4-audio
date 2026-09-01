@@ -78,25 +78,66 @@ def _stored_input_names(data: dict[str, Any], options: dict[str, Any] | None, co
     return names
 
 
-def _text_box(*, prefix: str) -> selector.TextSelector:
-    return selector.TextSelector(selector.TextSelectorConfig(prefix=prefix))
+def _text_box(*, hint: str) -> selector.TextSelector:
+    """Empty-box hint. Core schema rejects placeholder; frontend still renders it."""
+    try:
+        box = selector.TextSelector({"placeholder": hint})  # type: ignore[arg-type]
+        return box
+    except (vol.Invalid, TypeError, ValueError, KeyError):
+        pass
+    box = selector.TextSelector()
+    config = getattr(box, "config", None)
+    if isinstance(config, dict):
+        config["placeholder"] = hint
+        return box
+    if config is not None:
+        try:
+            box.config = {**dict(config), "placeholder": hint}
+        except (TypeError, AttributeError):
+            pass
+    return box
 
 
-def _zone_schema(count: int, stored: dict[int, dict]) -> dict[Any, Any]:
+def _is_matrix_model(model: dict[str, Any]) -> bool:
+    return model.get("kind") == "matrix"
+
+
+def _output_placeholders(is_matrix: bool) -> dict[str, str]:
+    if is_matrix:
+        return {
+            "output_kind": "line-level outputs",
+            "area_help": "Outputs stay in the same area as the switch — no room assignment.",
+        }
+    return {
+        "output_kind": "speaker zones",
+        "area_help": "Choose a room for each named zone.",
+    }
+
+
+def _zone_schema(
+    count: int,
+    stored: dict[int, dict],
+    *,
+    jack: str,
+    include_areas: bool,
+) -> dict[Any, Any]:
     fields: dict[Any, Any] = {}
     for index in range(1, count + 1):
         cfg = stored.get(index, {})
         name = cfg.get("name") or ""
-        area = cfg.get("area_id")
-        name_box = _text_box(prefix=f"Zone {index} Name")
+        name_box = _text_box(hint=f"{jack} {index}")
         if name:
             fields[vol.Optional(_zone_name_key(index), default=name)] = name_box
         else:
             fields[vol.Optional(_zone_name_key(index))] = name_box
-        if area:
-            fields[vol.Optional(_zone_area_key(index), default=area)] = selector.AreaSelector()
-        else:
-            fields[vol.Optional(_zone_area_key(index))] = selector.AreaSelector()
+        if include_areas:
+            area = cfg.get("area_id")
+            if area:
+                fields[vol.Optional(_zone_area_key(index), default=area)] = (
+                    selector.AreaSelector()
+                )
+            else:
+                fields[vol.Optional(_zone_area_key(index))] = selector.AreaSelector()
     return fields
 
 
@@ -104,7 +145,7 @@ def _input_schema(count: int, stored: list[str]) -> dict[Any, Any]:
     fields: dict[Any, Any] = {}
     for index in range(1, count + 1):
         default = stored[index - 1] if index - 1 < len(stored) else ""
-        box = _text_box(prefix=f"Input {index} Name")
+        box = _text_box(hint=f"Input {index}")
         if default:
             fields[vol.Optional(_input_name_key(index), default=default)] = box
         else:
@@ -112,7 +153,9 @@ def _input_schema(count: int, stored: list[str]) -> dict[Any, Any]:
     return fields
 
 
-def _extract_zones(user_input: dict[str, Any], count: int) -> dict[str, Any]:
+def _extract_zones(
+    user_input: dict[str, Any], count: int, *, include_areas: bool = True
+) -> dict[str, Any]:
     packed = dict(user_input)
     zones: dict[str, dict[str, str | None]] = {}
     for index in range(1, count + 1):
@@ -123,6 +166,8 @@ def _extract_zones(user_input: dict[str, Any], count: int) -> dict[str, Any]:
         else:
             name = str(packed.pop(_zone_name_key(index), "") or "").strip()
             area = packed.pop(_zone_area_key(index), None) or None
+        if not include_areas:
+            area = None
         zones[str(index)] = {"name": name, "area_id": area}
     packed[CONF_ZONES] = zones
     packed.pop(CONF_ZONE_NAMES, None)
@@ -320,15 +365,26 @@ class C4AudioConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_outputs(self, user_input: dict[str, Any] | None = None):
         model = MODELS.get(self._data.get(CONF_MODEL), MODELS[MODEL_AMP16])
+        is_matrix = _is_matrix_model(model)
         if user_input is not None:
-            self._data.update(_extract_zones(user_input, model["zones"]))
+            self._data.update(
+                _extract_zones(user_input, model["zones"], include_areas=not is_matrix)
+            )
             _apply_setup_defaults(self._data)
             return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
 
         stored = _stored_zone_map(self._data, None, model["zones"])
         return self.async_show_form(
             step_id="outputs",
-            data_schema=vol.Schema(_zone_schema(model["zones"], stored)),
+            data_schema=vol.Schema(
+                _zone_schema(
+                    model["zones"],
+                    stored,
+                    jack="Output" if is_matrix else "Zone",
+                    include_areas=not is_matrix,
+                )
+            ),
+            description_placeholders=_output_placeholders(is_matrix),
         )
 
     @staticmethod
@@ -369,13 +425,24 @@ class C4AudioOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_outputs(self, user_input: dict[str, Any] | None = None):
         model = MODELS[self._entry.data[CONF_MODEL]]
+        is_matrix = _is_matrix_model(model)
         if user_input is not None:
-            packed = _extract_zones(user_input, model["zones"])
+            packed = _extract_zones(
+                user_input, model["zones"], include_areas=not is_matrix
+            )
             return self.async_create_entry(title="", data=self._merged_options(packed))
         stored = _stored_zone_map(self._entry.data, dict(self._entry.options), model["zones"])
         return self.async_show_form(
             step_id="outputs",
-            data_schema=vol.Schema(_zone_schema(model["zones"], stored)),
+            data_schema=vol.Schema(
+                _zone_schema(
+                    model["zones"],
+                    stored,
+                    jack="Output" if is_matrix else "Zone",
+                    include_areas=not is_matrix,
+                )
+            ),
+            description_placeholders=_output_placeholders(is_matrix),
         )
 
     async def async_step_settings(self, user_input: dict[str, Any] | None = None):

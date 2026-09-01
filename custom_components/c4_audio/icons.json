@@ -7,6 +7,11 @@
           "off": "mdi:speaker-off"
         }
       }
+    },
+    "select": {
+      "source": {
+        "default": "mdi:import"
+      }
     }
   }
 }

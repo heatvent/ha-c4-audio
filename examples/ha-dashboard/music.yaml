@@ -1,0 +1,102 @@
+# Whole-home music view (HA 2024.12+ sections dashboard).
+#
+# 1. Confirm entity IDs: Settings → Devices → WiiM / Control4 Audio.
+# 2. Match `source: WiiM Pro` to the amp input name from setup.
+# 3. Dashboards → your dashboard → ⋮ → Raw configuration editor.
+#    Paste this as a new item under `views:`, or replace an empty view.
+# 4. Add the scripts in scripts.yaml (or Helpers → Script).
+
+  - title: Music
+    path: music
+    icon: mdi:music
+    type: sections
+    max_columns: 2
+    sections:
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Now playing
+            heading_style: title
+            icon: mdi:speaker-wireless
+          - type: media-control
+            entity: media_player.media_closet_wiim_pro
+          - type: markdown
+            content: >
+              Playback is the WiiM. Leave its volume high.
+              Room sliders below are the 16AMP3.
+          - type: horizontal-stack
+            cards:
+              - type: button
+                name: All On
+                icon: mdi:play-circle
+                tap_action:
+                  action: perform-action
+                  perform_action: script.whole_home_music_on
+              - type: button
+                name: All Off
+                icon: mdi:stop-circle-outline
+                tap_action:
+                  action: perform-action
+                  perform_action: script.whole_home_music_off
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Zone Control
+            heading_style: title
+            icon: mdi:speaker-multiple
+          - type: tile
+            entity: media_player.kitchen
+            name: Kitchen
+            features:
+              - type: media-player-volume-slider
+            features_position: bottom
+          - type: tile
+            entity: media_player.dining
+            name: Dining
+            features:
+              - type: media-player-volume-slider
+            features_position: bottom
+          - type: tile
+            entity: media_player.patio
+            name: Patio
+            features:
+              - type: media-player-volume-slider
+            features_position: bottom
+          - type: tile
+            entity: media_player.master_br
+            name: Master BR
+            features:
+              - type: media-player-volume-slider
+            features_position: bottom
+          - type: tile
+            entity: media_player.master_bath
+            name: Master Bath
+            features:
+              - type: media-player-volume-slider
+            features_position: bottom
+          - type: tile
+            entity: media_player.bar
+            name: Bar
+            features:
+              - type: media-player-volume-slider
+            features_position: bottom
+          - type: tile
+            entity: media_player.garage
+            name: Garage
+            features:
+              - type: media-player-volume-slider
+            features_position: bottom
+
+# Optional: if HACS Mushroom is installed, swap the WiiM card for:
+#
+#          - type: custom:mushroom-media-player-card
+#            entity: media_player.wiim_pro
+#            use_media_info: true
+#            volume_controls: []
+#            media_controls:
+#              - previous
+#              - play_pause_stop
+#              - next
+#            collapsible_controls: true

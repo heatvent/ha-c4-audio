@@ -1,8 +1,10 @@
 # Control4 Audio
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/heatvent/ha-c4-audio)
 [![GitHub release](https://img.shields.io/github/v/release/heatvent/ha-c4-audio)](https://github.com/heatvent/ha-c4-audio/releases)
 [![HA](https://img.shields.io/badge/Home%20Assistant-2024.12%2B-blue.svg)](https://www.home-assistant.io/)
+
+**GitHub:** https://github.com/heatvent/ha-c4-audio
 
 Custom HACS integration for Control4 Ethernet **amplifiers** and the **C4-16ZAMSV3-B** 16×16 audio switch.
 

@@ -1,8 +1,16 @@
-# Control4 Audio for Home Assistant
+# Control4 Audio
+
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![GitHub release](https://img.shields.io/github/v/release/heatvent/ha-c4-audio)](https://github.com/heatvent/ha-c4-audio/releases)
+[![HA](https://img.shields.io/badge/Home%20Assistant-2024.12%2B-blue.svg)](https://www.home-assistant.io/)
 
 Custom HACS integration for Control4 Ethernet **amplifiers** and the **C4-16ZAMSV3-B** 16×16 audio switch.
 
-It talks **UDP 8750** straight to each chassis. It does **not** talk to Director. If Composer / the Control4 app should stay in charge, do not enable this alongside the official Control4 integration for the same rooms.
+Talks **UDP 8750** straight to each chassis. It does **not** talk to Director.
+
+> **Important:** Do not dual-control the same rooms with this integration and the official Control4 / Composer path. Last UDP sender wins.
+
+---
 
 ## Hardware
 
@@ -10,43 +18,70 @@ It talks **UDP 8750** straight to each chassis. It does **not** talk to Director
 |---|---|---|---|
 | C4-AMP108-1B | 4 stereo speaker zones | 8 | `c4.amp` |
 | C4-16AMP3-B | 8 stereo speaker zones | 8 | `c4.amp` |
-| C4-16ZAMSV3-B | 16 line-level outputs | 16 | `c4.asw` (matrix switch, not a speaker amp) |
+| C4-16ZAMSV3-B | 16 line-level outputs | 16 | `c4.asw` |
 
-Add **one integration entry per chassis**. A second 8-zone amp is a second amp entry, not a “16-zone amp” model.
+Add **one integration entry per chassis**. A second 8-zone amp is a second amp entry — not a “16-zone amp” model.
 
-**Whole-home music (no AVRs on this path):** add the **C4-16AMP3-B** and put sources on its analog inputs (WiiM analog out is enough). Leave unused amp zones unnamed. The 16×16 switch is optional — only add it if several line-level sources still share one amp input. Leave switch outputs that used to feed receivers unnamed so they never become `media_player`s. Living room / basement ceilings stay off this integration unless you land those speakers on spare amp zones (the 16AMP3 has eight).
+### Typical whole-home music layout
+
+1. Streamer (e.g. WiiM) analog out → amp input  
+2. Name only the amp zones you use; leave unused jacks blank  
+3. 16×16 switch is **optional** — only if several line-level sources share one amp input  
+4. Leave old AVR feed outputs unnamed so they never become `media_player`s  
+
+---
 
 ## Install (HACS)
 
-1. HACS → Integrations → Custom repositories → `https://github.com/heatvent/ha-c4-audio`, category **Integration**.
-2. Download **Control4 Audio**, restart Home Assistant.
-3. Settings → Devices & Services → Add Integration → **Control4 Audio** (domain `c4_audio`).
+1. **HACS → Integrations → ⋮ → Custom repositories**
+2. URL: `https://github.com/heatvent/ha-c4-audio` · Category: **Integration**
+3. Download **Control4 Audio**, then **restart** Home Assistant
+4. **Settings → Devices & Services → Add Integration → Control4 Audio** (`c4_audio`)
 
-Do not copy this whole git repo into `custom_components`, and do not rename the folder to `control4_amp`. Home Assistant loads the folder name as the domain; a `control4_amp` folder without `async_setup_entry` produces *No setup or config entry setup function defined*.
+HACS follows **GitHub Releases** (`v1.0.8`, …), not the tip of `main`.
 
-Releases and version history: [CHANGELOG.md](CHANGELOG.md).
+### Manual install
+
+Copy only `custom_components/c4_audio` into your HA `custom_components` folder. Do **not** drop the whole git repo there, and do **not** rename the folder (Home Assistant uses the folder name as the domain).
+
+---
 
 ## Setup
 
-1. Add Integration → **Control4 Audio**. Pick the chassis (or enter IP) and the hardware type.
-2. **Inputs:** one name box per jack. Leave a box empty to skip that input.
-3. **Amp outputs:** one name box and a room dropdown per zone. Leave a name empty to skip that zone.
-4. **Switch outputs:** name boxes labeled as Output 1, Output 2, … with no room picker. Named outputs stay in the same area as the switch.
-5. Volume, polling, UDP timeout, bass/treble, and amp↔switch link stay at defaults. Change them later under **Configure** if needed.
+1. Pick the chassis (discovery or IP) and hardware type  
+2. **Inputs** — one name per jack; leave blank to skip  
+3. **Amp outputs** — name + room (area); blank name = no entity  
+4. **Switch outputs** — Output 1…16 names only (no room picker); stay in the switch area  
+5. Defaults are fine for volume, polling, and timeouts — change later under **Configure**
 
-Named outputs and zones are `media_player`s. Each also gets a **Source** dropdown on the same Home Assistant device so you can pick an input from the device page without opening more-info. Name the inputs in setup or those lists stay empty.
+Named zones/outputs are `media_player`s. Each also gets a **Source** dropdown on the device page.
 
-If WiiM (and anything else) are wired **straight into the amp**, skip the switch entry and the link. Selecting WiiM only sends `c4.amp.out` to that amp input. Every zone you route to the same amp jack hears the same analog source — that is the wiring, not a software mix.
+If sources plug **straight into the amp**, skip the switch entry and the amp↔switch link. Selecting a source only sends `c4.amp.out` to that jack. Every zone on the same jack hears the same analog feed — that is the wiring, not a mix.
+
+---
+
+## Features
+
+- Per-zone on/off, volume, mute, and source select over UDP  
+- Turn-on volume (default **10%**) after route, while still muted  
+- **All on** / **All off** buttons and an **All zones** switch per chassis  
+- Services: `c4_audio.turn_on_all`, `turn_off_all`, `set_route`, `send_command`  
+- Without `host`, All on/off target **amps only** (pass switch IP for named switch outputs)  
+- Optional amp↔switch carry-through for shared buses  
+- Diagnostic **UDP activity** sensor (SET / replies / `0t`, not GET polls)  
+- Bass / treble number entities when EQ is enabled  
+
+---
 
 ## Status polling
 
-Each chassis is polled about every **15 seconds** (configurable 5–300): firmware, routes (`ain`), volume, mute, and bass/treble when EQ sliders are on. After a SET, the integration immediately re-reads that chassis (and the linked switch) so Home Assistant matches the hardware. Unsolicited `0t` status frames are applied when the amp/switch sends them.
+Each chassis is polled about every **15 seconds** (5–300 configurable): firmware, routes (`ain`), volume, mute, and bass/treble when EQ is on. After a SET, the chassis (and linked switch) are re-read immediately. Unsolicited `0t` frames are applied when the hardware sends them.
 
-Each chassis also has a diagnostic **UDP activity** sensor. It lists SET commands, their replies, and unsolicited status (not the 15-second GET polls). Example card:
+### UDP activity card example
 
 ```yaml
 type: markdown
-title: Amp UDP
+title: Log
 card_mod:
   style: |
     ha-card {
@@ -60,28 +95,50 @@ content: |
   ```
 ```
 
-Fix the entity ID to match Settings → Devices → your amp → UDP activity.
+Use the entity ID from **Settings → Devices → your amp → UDP activity**.
+
+---
 
 ## Controls (confirmed UDP)
 
-**Amp (`c4.amp`)**
+### Amplifier (`c4.amp`)
 
-- Route / power: `out`, mute `00`/`01`
-- Volume: `chvol` (percent + 155). Step ±1% in the UI. Max volume is a software cap on the slider. Do **not** send `chvolmax` (firmware snaps live level to the cap).
-- Tone: `bassgain` / `trebgain` as number entities
-- Poll: `ain`, `avol`, `amut`, `abss`, `atrb`, `c4.sy.fwv`
-- `psave` only on AMP108 (16AMP3 returns `n01`)
+| Function | Command / notes |
+|---|---|
+| Route / power | `out` · `00` = disconnected |
+| Mute | `00` / `01` |
+| Volume | `chvol` (percent + 155) · UI ±1% · software max cap |
+| Tone | `bassgain` / `trebgain` number entities |
+| Poll | `ain`, `avol`, `amut`, `abss`, `atrb`, `c4.sy.fwv` |
 
-**Switch (`c4.asw`)**
+Do **not** send `chvolmax` on zone off — 16AMP3 firmware snaps live volume to the cap. `psave` works on AMP108; 16AMP3 returns `n01`.
 
-- Route: `out` (output 16 is hex `10`)
-- Mute; line volume `vol` (`64` = 100 = unity)
-- Poll: `ain` (and volume/mute when the firmware answers)
+### Switch (`c4.asw`)
 
-**Services:** `c4_audio.send_command`, `c4_audio.set_route`, `c4_audio.turn_on_all`, `c4_audio.turn_off_all`. Without `host`, All on/off only touch **amps**. Pass the switch IP to change named switch outputs.
+| Function | Notes |
+|---|---|
+| Route | `out` (output 16 = hex `10`) |
+| Mute / volume | Line `vol` (`64` = 100 = unity) |
+| Poll | `ain` (and volume/mute when firmware answers) |
 
-Each chassis also has **All on** / **All off** buttons and an **All zones** switch. Expose **All zones** to Alexa (Nabu Casa → Alexa → expose entities). Automations can call the switch, the buttons, or the services without listing every room.
+### Whole-home helpers
 
-Example Home Assistant Music dashboard (WiiM + amp zones): [examples/ha-dashboard](examples/ha-dashboard).
+Each chassis has **All on** / **All off** buttons and an **All zones** switch (on if any named zone is on). Expose **All zones** to Alexa, or call the buttons / `c4_audio.turn_on_all` / `turn_off_all`.
 
-Protocol details: [PROTOCOL.md](PROTOCOL.md). Probe tools: [tools/README.md](tools/README.md).
+Example Music dashboard (WiiM + amp zones): [examples/ha-dashboard](examples/ha-dashboard).
+
+---
+
+## Docs
+
+| Doc | Contents |
+|---|---|
+| [CHANGELOG.md](CHANGELOG.md) | Release history (SemVer tags) |
+| [PROTOCOL.md](PROTOCOL.md) | UDP framing and command notes |
+| [tools/README.md](tools/README.md) | Probe / capture helpers |
+
+---
+
+## Related
+
+For Music Assistant zone facades (decoder plays; amp zones are power/volume players), see [ha-amp-zone-player](https://github.com/heatvent/ha-amp-zone-player).

@@ -2,17 +2,17 @@
 
 WiiM is the player (art, play/pause, skip, browse). Control4 Audio zones are the speakers (on/off and volume). Do not put play/pause on the amp entities — they have no transport.
 
-1. Copy `scripts.yaml` into HA (or recreate the two scripts in Helpers).
+1. Copy `scripts.yaml` into HA if All Off should also stop the WiiM (the amp service does not).
 2. Copy the view in `music.yaml` into a sections dashboard (raw YAML).
 3. Fix entity IDs and the source string `WiiM Pro`.
 
-Turn a single room on from its tile. **All On** routes every named zone to WiiM. **All Off** disconnects the amp zones and turns the WiiM off. Use the **5 Star** preset (or another WiiM preset) for playlists.
+Turn a single room on from its tile. **All On** calls `c4_audio.turn_on_all` (already-on rooms keep volume). **All Off** calls `c4_audio.turn_off_all` and then turns the WiiM off. Use **WiiM Pro** (or a preset) to pick the source.
 
 After 1.0.6, add a live UDP log (entity ID from the amp device page):
 
 ```yaml
 type: markdown
-title: Amp UDP
+title: Log
 card_mod:
   style: |
     ha-card {

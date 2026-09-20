@@ -32,7 +32,7 @@
                 icon: mdi:play-circle
                 tap_action:
                   action: perform-action
-                  perform_action: script.whole_home_music_on
+                  perform_action: c4_audio.turn_on_all
               - type: button
                 name: All Off
                 icon: mdi:stop-circle-outline

@@ -10,6 +10,8 @@ Custom HACS integration for Control4 Ethernet **amplifiers** and the **C4-16ZAMS
 
 Talks **UDP 8750** straight to each chassis. It does **not** talk to Director.
 
+Developed with [Cursor](https://cursor.com).
+
 > **Important:** Do not dual-control the same rooms with this integration and the official Control4 / Composer path. Last UDP sender wins.
 
 ---

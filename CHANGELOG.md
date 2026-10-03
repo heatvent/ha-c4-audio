@@ -7,6 +7,7 @@ HACS shows the GitHub **release tag** (not a git commit hash). Each published ve
 ## [1.0.9]
 
 - Fix hassfest validation: empty labels for input/zone name fields (NBSP was rejected as trailing whitespace)
+- Sort manifest.json keys for hassfest
 
 ## [1.0.8]
 

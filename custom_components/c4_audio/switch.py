@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import device_info_for
 from .const import DOMAIN
 from .coordinator import C4AudioCoordinator
+from .entity_ids import entity_unique_id
 
 
 async def async_setup_entry(
@@ -27,7 +28,7 @@ class C4AllZonesSwitch(CoordinatorEntity[C4AudioCoordinator], SwitchEntity):
 
     def __init__(self, coordinator: C4AudioCoordinator) -> None:
         super().__init__(coordinator)
-        self._attr_unique_id = f"{coordinator.host}_all_zones"
+        self._attr_unique_id = entity_unique_id(coordinator.entry, "all_zones")
         self._attr_device_info = device_info_for(coordinator)
 
     @property

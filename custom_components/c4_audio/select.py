@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import device_info_for
 from .const import DOMAIN, SKIP_NAME
 from .coordinator import C4AudioCoordinator
+from .entity_ids import entity_unique_id
 
 SOURCE_OFF = "Off"
 
@@ -33,7 +34,7 @@ class C4SourceSelect(CoordinatorEntity[C4AudioCoordinator], SelectEntity):
         super().__init__(coordinator)
         self._zone = zone
         kind = "output" if coordinator.is_matrix else "zone"
-        self._attr_unique_id = f"{coordinator.host}_{kind}_{zone}_source"
+        self._attr_unique_id = entity_unique_id(coordinator.entry, f"{kind}_{zone}_source")
         self._attr_device_info = device_info_for(coordinator)
 
     async def async_added_to_hass(self) -> None:

@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import device_info_for
 from .const import DOMAIN
 from .coordinator import C4AudioCoordinator
+from .entity_ids import entity_unique_id
 
 
 async def async_setup_entry(
@@ -31,7 +32,7 @@ class C4AllButton(CoordinatorEntity[C4AudioCoordinator], ButtonEntity):
     def __init__(self, coordinator: C4AudioCoordinator, action: str) -> None:
         super().__init__(coordinator)
         self._action = action
-        self._attr_unique_id = f"{coordinator.host}_all_{action}"
+        self._attr_unique_id = entity_unique_id(coordinator.entry, f"all_{action}")
         self._attr_device_info = device_info_for(coordinator)
         self._attr_translation_key = "all_on" if action == "on" else "all_off"
         self._attr_icon = "mdi:play-circle" if action == "on" else "mdi:stop-circle-outline"

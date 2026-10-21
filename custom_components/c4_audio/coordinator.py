@@ -243,8 +243,6 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
 
     async def async_start(self) -> None:
         await self.client.async_start()
-        if self.model.get("wake_power_save"):
-            await self.client.async_send(*self.cmds.set_power_save("00"))
 
     async def async_shutdown(self) -> None:
         await self.client.async_stop()

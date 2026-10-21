@@ -89,7 +89,7 @@ Amp zones are speakers (on/off, volume, source). Put play/pause / browse on the 
 3. Download **Control4 Audio**, then **restart** Home Assistant
 4. **Settings → Devices & Services → Add Integration → Control4 Audio** (`c4_audio`)
 
-HACS follows **GitHub Releases** (`v1.0.10`, …), not the tip of `main`.
+HACS follows **GitHub Releases** (`v1.0.11`, …), not the tip of `main`.
 
 ### Manual install
 
@@ -171,7 +171,7 @@ Use the entity ID from **Settings → Devices → your amp → UDP activity**.
 | Tone | `bassgain` / `trebgain` number entities |
 | Poll | `ain`, `avol`, `amut`, `abss`, `atrb`, `c4.sy.fwv` |
 
-Do **not** send `chvolmax` on zone off — 16AMP3 firmware snaps live volume to the cap. `psave` works on AMP108; 16AMP3 returns `n01`.
+Do **not** send `chvolmax` on zone off — 16AMP3 firmware snaps live volume to the cap. AMP108 gets `psave 00` only when a zone turns on (not on Home Assistant startup). 16AMP3 returns `n01` for that command.
 
 ### Switch (`c4.asw`)
 

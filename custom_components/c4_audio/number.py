@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import device_info_for
 from .const import DOMAIN
 from .coordinator import C4AudioCoordinator
+from .entity_ids import entity_unique_id
 
 
 async def async_setup_entry(
@@ -37,7 +38,7 @@ class C4ToneNumber(CoordinatorEntity[C4AudioCoordinator], NumberEntity):
         super().__init__(coordinator)
         self._zone = zone
         self._kind = kind
-        self._attr_unique_id = f"{coordinator.host}_zone_{zone}_{kind}"
+        self._attr_unique_id = entity_unique_id(coordinator.entry, f"zone_{zone}_{kind}")
         self._attr_device_info = device_info_for(coordinator)
         self._attr_translation_key = kind
 

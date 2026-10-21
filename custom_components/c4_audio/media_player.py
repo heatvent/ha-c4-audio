@@ -16,6 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import device_info_for
 from .const import DOMAIN
 from .coordinator import C4AudioCoordinator
+from .entity_ids import entity_unique_id
 
 
 async def async_setup_entry(
@@ -42,7 +43,7 @@ class C4ZoneMediaPlayer(CoordinatorEntity[C4AudioCoordinator], MediaPlayerEntity
     def __init__(self, coordinator: C4AudioCoordinator, zone: int) -> None:
         super().__init__(coordinator)
         self._zone = zone
-        self._attr_unique_id = f"{coordinator.host}_zone_{zone}"
+        self._attr_unique_id = entity_unique_id(coordinator.entry, f"zone_{zone}")
         self._attr_device_info = device_info_for(coordinator)
 
     async def async_added_to_hass(self) -> None:

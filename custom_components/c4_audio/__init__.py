@@ -7,14 +7,16 @@ import logging
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .const import CONF_IDENT, DOMAIN, MODELS, PLATFORMS
 from .coordinator import C4AudioCoordinator
+from .entity_ids import migrated_unique_id, stable_instance_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,6 +54,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+    await _async_migrate_entity_unique_ids(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _register_services(hass)
     return True
@@ -59,6 +62,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def _async_migrate_entity_unique_ids(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Rewrite IP-based unique IDs so a DHCP change does not orphan entities."""
+    stable = stable_instance_id(entry)
+    host = entry.data.get(CONF_HOST)
+    registry = er.async_get(hass)
+    updates: dict[str, str] = {}
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        new_id = migrated_unique_id(entity.unique_id, stable_id=stable, host=host)
+        if not new_id:
+            continue
+        existing = registry.async_get_entity_id(entity.domain, DOMAIN, new_id)
+        if existing and existing != entity.entity_id:
+            registry.async_remove(entity.entity_id)
+            continue
+        updates[entity.entity_id] = new_id
+
+    if not updates:
+        return
+
+    @callback
+    def _migrator(entity_entry: er.RegistryEntry) -> dict[str, str] | None:
+        new_id = updates.get(entity_entry.entity_id)
+        if not new_id:
+            return None
+        return {"new_unique_id": new_id}
+
+    await er.async_migrate_entries(hass, entry.entry_id, _migrator)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

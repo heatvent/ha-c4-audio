@@ -8,7 +8,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant, ServiceCall, callback
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -40,6 +40,18 @@ def _match(hass: HomeAssistant, host: str | None, *, amps_only: bool = False) ->
     elif amps_only:
         items = [item for item in items if not item.is_matrix]
     return items
+
+
+def _one_device(hass: HomeAssistant, host: str | None, service: str) -> C4AudioCoordinator:
+    """One chassis. host is required when more than one entry is loaded."""
+    matched = _match(hass, host)
+    if not matched:
+        raise HomeAssistantError(f"No Control4 Audio device matched for {service}")
+    if not host and len(matched) > 1:
+        raise HomeAssistantError(
+            f"{service} needs host when more than one Control4 Audio chassis is configured"
+        )
+    return matched[0]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -109,20 +121,16 @@ def _register_services(hass: HomeAssistant) -> None:
 
     async def handle_send_command(call: ServiceCall) -> None:
         command = call.data[ATTR_COMMAND]
-        matched = _match(hass, call.data.get(CONF_HOST))
-        if not matched:
-            _LOGGER.error("No Control4 Audio device matched for send_command")
-            return
-        reply = await matched[0].async_send_raw(command)
+        coordinator = _one_device(hass, call.data.get(CONF_HOST), SERVICE_SEND_COMMAND)
+        reply = await coordinator.async_send_raw(command)
+        if reply is None:
+            raise HomeAssistantError(f"No reply from {coordinator.host} for {command}")
         _LOGGER.info("Raw command %s → %s", command, reply)
 
     async def handle_set_route(call: ServiceCall) -> None:
-        matched = _match(hass, call.data.get(CONF_HOST))
-        if not matched:
-            _LOGGER.error("No Control4 Audio device matched for set_route")
-            return
-        await matched[0].async_route_output(int(call.data[ATTR_OUTPUT]), int(call.data[ATTR_INPUT]))
-        await matched[0].async_request_refresh()
+        coordinator = _one_device(hass, call.data.get(CONF_HOST), SERVICE_SET_ROUTE)
+        await coordinator.async_route_output(int(call.data[ATTR_OUTPUT]), int(call.data[ATTR_INPUT]))
+        await coordinator.async_request_refresh()
 
     async def handle_turn_off_all(call: ServiceCall) -> None:
         matched = _match(hass, call.data.get(CONF_HOST), amps_only=True)

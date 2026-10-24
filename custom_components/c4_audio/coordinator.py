@@ -55,6 +55,7 @@ from .routing import (
     resolve_source_choice,
     split_names,
     visible_names,
+    volume_reading_is_stale,
 )
 from .udp_client import C4UdpClient
 
@@ -241,6 +242,38 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
     def zone_is_on(self, zone: int) -> bool:
         return self.state.zones[zone].source > 0
 
+    def _check_output(self, zone: int, source: int | None = None) -> None:
+        if zone not in self.state.zones:
+            raise HomeAssistantError(
+                f"Output {zone} is out of range for {self.host} (1-{self.zone_count})"
+            )
+        if source is not None and (source < 0 or source > self.input_count):
+            raise HomeAssistantError(
+                f"Input {source} is out of range for {self.host} (0-{self.input_count})"
+            )
+
+    async def _async_require_send(self, command: tuple[str, str]) -> ParsedPacket:
+        packet = await self.client.async_send(*command)
+        if packet is None:
+            raise HomeAssistantError(f"No reply from {self.host} for {command[1]}")
+        return packet
+
+    def _volume_is_stale(self, zone: int, decoded: int) -> bool:
+        last = self._last_commanded_volume.get(zone)
+        if last is None:
+            return False
+        return volume_reading_is_stale(
+            now=time.monotonic(),
+            commanded_at=last[0],
+            commanded=last[1],
+            decoded=decoded,
+            hold_s=_VOLUME_HOLD_S,
+        )
+
+    async def _async_wake(self) -> None:
+        if self.model.get("wake_power_save"):
+            await self._async_require_send(self.cmds.set_power_save("00"))
+
     async def async_start(self) -> None:
         await self.client.async_start()
 
@@ -257,11 +290,12 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
 
     async def _async_apply_turn_on_volume(self, zone: int) -> None:
         volume = clamp_volume(self.on_volume, self.max_volume)
-        await self.client.async_send(*self.cmds.set_volume(zone, volume))
+        await self._async_require_send(self.cmds.set_volume(zone, volume))
         self.state.zones[zone].volume = volume
         self._remember_volume(zone, volume)
 
     async def async_select_source(self, zone: int, source_name: str) -> None:
+        self._check_output(zone)
         switch = self.linked_switch()
         switch_names = switch.source_names if switch else None
         try:
@@ -272,58 +306,80 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
             raise HomeAssistantError(f"Unknown source {source_name}") from err
 
         was_off = self.state.zones[zone].source <= 0
+        touched_switch = False
         if kind == KIND_SWITCH and switch is not None and switch_output and switch_input:
             await switch.async_route_output(switch_output, switch_input)
+            touched_switch = True
             await self.async_route_output(zone, amp_input, unmute=not was_off)
         else:
             await self.async_route_output(zone, amp_input, unmute=not was_off)
         if was_off and amp_input > 0:
             await self._async_apply_turn_on_volume(zone)
-            await self.client.async_send(*self.cmds.set_mute(zone, False))
+            await self._async_require_send(self.cmds.set_mute(zone, False))
             self.state.zones[zone].muted = False
             self.async_set_updated_data(self.state)
-        await self._async_confirm()
+        await self._async_confirm(include_switch=touched_switch)
 
     async def async_route_output(self, zone: int, source: int, *, unmute: bool = True) -> None:
+        self._check_output(zone, source)
         if not self.is_matrix and source > 0:
-            await self.client.async_send(*self.cmds.get_digital(source))
-        await self.client.async_send(*self.cmds.set_output(zone, source))
+            await self._async_require_send(self.cmds.get_digital(source))
+        await self._async_require_send(self.cmds.set_output(zone, source))
         if source > 0 and unmute:
-            await self.client.async_send(*self.cmds.set_mute(zone, False))
+            await self._async_require_send(self.cmds.set_mute(zone, False))
             self.state.zones[zone].muted = False
         self.state.zones[zone].source = source
         self.async_set_updated_data(self.state)
 
-    async def async_turn_on(self, zone: int, *, confirm: bool = True) -> None:
+    async def async_turn_on(
+        self,
+        zone: int,
+        *,
+        confirm: bool = True,
+        volume: int | None = None,
+        wake: bool = True,
+    ) -> None:
+        self._check_output(zone)
         current = self.state.zones[zone]
         if current.source > 0:
             if current.muted:
-                await self.client.async_send(*self.cmds.set_mute(zone, False))
+                await self._async_require_send(self.cmds.set_mute(zone, False))
                 current.muted = False
                 self.async_set_updated_data(self.state)
             if confirm:
                 await self._async_confirm()
             return
         source = self.default_source_index()
-        if self.model.get("wake_power_save"):
-            await self.client.async_send(*self.cmds.set_power_save("00"))
+        if wake:
+            await self._async_wake()
         await self.async_route_output(zone, source, unmute=False)
-        await self._async_apply_turn_on_volume(zone)
+        if volume is None:
+            await self._async_apply_turn_on_volume(zone)
+        else:
+            percent = clamp_volume(int(volume), self.max_volume)
+            await self._async_require_send(self.cmds.set_volume(zone, percent))
+            current.volume = percent
+            self._remember_volume(zone, percent)
         if source > 0:
-            await self.client.async_send(*self.cmds.set_mute(zone, False))
+            await self._async_require_send(self.cmds.set_mute(zone, False))
             current.muted = False
         self.async_set_updated_data(self.state)
         if confirm:
             await self._async_confirm()
 
     async def async_turn_on_all(self) -> None:
+        if self.model.get("wake_power_save") and any(
+            not self.zone_is_on(zone) for zone in self.enabled_zones
+        ):
+            await self._async_wake()
         for zone in self.enabled_zones:
-            await self.async_turn_on(zone, confirm=False)
+            await self.async_turn_on(zone, confirm=False, wake=False)
         await self._async_confirm()
 
     async def async_turn_off(self, zone: int, *, confirm: bool = True) -> None:
-        await self.client.async_send(*self.cmds.set_mute(zone, True))
-        await self.client.async_send(*self.cmds.set_output(zone, 0))
+        self._check_output(zone)
+        await self._async_require_send(self.cmds.set_mute(zone, True))
+        await self._async_require_send(self.cmds.set_output(zone, 0))
         # Never send chvolmax here. 16AMP3 firmware snaps live volume to the cap.
         self.state.zones[zone].source = 0
         self.state.zones[zone].muted = True
@@ -337,37 +393,50 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
         await self._async_confirm()
 
     async def async_set_volume(self, zone: int, volume: float, *, as_percent: bool = False) -> None:
+        self._check_output(zone)
         percent = clamp_volume(ha_volume_to_percent(volume, as_percent=as_percent), self.max_volume)
-        await self.client.async_send(*self.cmds.set_volume(zone, percent))
+        if self.state.zones[zone].source <= 0:
+            await self.async_turn_on(zone, volume=percent)
+            return
+        await self._async_require_send(self.cmds.set_volume(zone, percent))
         self.state.zones[zone].volume = percent
         self._remember_volume(zone, percent)
         if percent > 0 and self.state.zones[zone].muted:
-            await self.client.async_send(*self.cmds.set_mute(zone, False))
+            await self._async_require_send(self.cmds.set_mute(zone, False))
             self.state.zones[zone].muted = False
         self.async_set_updated_data(self.state)
 
     async def async_adjust_volume(self, zone: int, delta: int) -> None:
-        current = self.state.zones[zone].volume
+        self._check_output(zone)
+        if self.state.zones[zone].source <= 0:
+            current = self.on_volume
+        else:
+            current = self.state.zones[zone].volume
         await self.async_set_volume(zone, current + delta, as_percent=True)
 
     async def async_set_mute(self, zone: int, muted: bool) -> None:
-        await self.client.async_send(*self.cmds.set_mute(zone, muted))
+        self._check_output(zone)
+        await self._async_require_send(self.cmds.set_mute(zone, muted))
         self.state.zones[zone].muted = muted
         self.async_set_updated_data(self.state)
 
     async def async_set_bass(self, zone: int, db: int) -> None:
-        await self.client.async_send(*self.cmds.set_bass(zone, db))
+        self._check_output(zone)
+        await self._async_require_send(self.cmds.set_bass(zone, db))
         self.state.zones[zone].bass = db
         self.async_set_updated_data(self.state)
 
     async def async_set_treble(self, zone: int, db: int) -> None:
-        await self.client.async_send(*self.cmds.set_treble(zone, db))
+        self._check_output(zone)
+        await self._async_require_send(self.cmds.set_treble(zone, db))
         self.state.zones[zone].treble = db
         self.async_set_updated_data(self.state)
 
-    async def _async_confirm(self) -> None:
-        """Re-read hardware after a SET so HA matches the chassis."""
+    async def _async_confirm(self, *, include_switch: bool = False) -> None:
+        """Re-read this chassis. The linked switch is included only after a matrix route."""
         await self.async_request_refresh()
+        if not include_switch:
+            return
         switch = self.linked_switch()
         if switch is not None:
             await switch.async_request_refresh()
@@ -381,17 +450,22 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
         if fw.args:
             self.state.firmware = fw.args[0].strip('"')
 
-        await self._poll_list(self.cmds.get_inputs(), self._apply_sources)
-        await self._poll_list(self.cmds.get_volumes(), self._apply_volumes)
-        await self._poll_list(self.cmds.get_mutes(), self._apply_mutes)
+        await self._poll_list(self.cmds.get_inputs(), self._apply_sources, required=True)
+        await self._poll_list(self.cmds.get_volumes(), self._apply_volumes, required=True)
+        await self._poll_list(self.cmds.get_mutes(), self._apply_mutes, required=True)
         if self.eq_enabled:
-            await self._poll_list(self.cmds.get_bass(), self._apply_bass)
-            await self._poll_list(self.cmds.get_treble(), self._apply_treble)
+            await self._poll_list(self.cmds.get_bass(), self._apply_bass, required=False)
+            await self._poll_list(self.cmds.get_treble(), self._apply_treble, required=False)
         return self.state
 
-    async def _poll_list(self, command: tuple[str, str], apply) -> None:  # noqa: ANN001
+    async def _poll_list(self, command: tuple[str, str], apply, *, required: bool) -> None:  # noqa: ANN001
         packet = await self.client.async_send(*command)
-        if packet is None or packet.status_code in {"n01", "e00"}:
+        if packet is None:
+            if required:
+                self.state.available = False
+                raise UpdateFailed(f"No reply from {self.host} for {command[1]}")
+            return
+        if packet.status_code in {"n01", "e00"}:
             return
         apply(parse_hex_list(packet.args))
 
@@ -402,13 +476,11 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
             self.state.zones[index].source = value
 
     def _apply_volumes(self, values: list[int | None]) -> None:
-        now = time.monotonic()
         for index, value in enumerate(values[: self.zone_count], start=1):
             if value is None:
                 continue
             decoded = self.cmds.decode_volume(f"{value:02x}")
-            last = self._last_commanded_volume.get(index)
-            if last and now - last[0] < _VOLUME_HOLD_S and abs(decoded - last[1]) >= 5:
+            if self._volume_is_stale(index, decoded):
                 continue
             self.state.zones[index].volume = decoded
 
@@ -453,6 +525,8 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
             zone = from_hex_byte(args[0])
             if zone in self.state.zones:
                 decoded = self.cmds.decode_volume(args[1])
+                if self._volume_is_stale(zone, decoded):
+                    return
                 self.state.zones[zone].volume = decoded
                 self._remember_volume(zone, decoded)
         else:

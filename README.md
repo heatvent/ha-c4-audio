@@ -35,9 +35,9 @@ It does **not** talk to Director, Composer, or the Control4 cloud. HA is the con
 
 Default **turn-on volume is 10%** on amps (configurable). Switch line outputs default to **100%** (unity). A **max volume** setting is a software cap in HA only — the integration never sends `chvolmax` (16AMP3 firmware snaps live volume to that cap).
 
-Off zones report the turn-on volume on the slider so Lovelace does not push 100% when you nudge volume. After a volume write, a stale high `avol` poll is ignored briefly so the UI does not jump.
+Off zones show the turn-on volume. Volume up/down starts from that level and turns the zone on. Dragging the slider while the zone is off turns it on at the level you set. For a couple of seconds after a volume write, a stale poll or unsolicited volume frame is ignored. A command that gets no UDP reply leaves Home Assistant state unchanged.
 
-**All on** only turns on zones that are off; rooms already playing keep their current volume. **All off** mutes and disconnects every named zone on that chassis.
+**All on** wakes an AMP108 once, then turns on only the zones that are off. Rooms already playing keep their current volume. **All off** mutes and disconnects every named zone on that chassis.
 
 ### Amp ↔ switch carry-through (optional)
 
@@ -53,7 +53,7 @@ If sources plug **straight into the amp**, skip the switch entry and leave the l
 
 ### Polling and activity
 
-Each entry is polled about every **15 seconds** (5–300 configurable): firmware, routes (`ain`), volume, mute, and bass/treble when EQ is on. After any SET, that chassis (and a linked switch) are re-read immediately. Unsolicited `0t` frames update state when the hardware sends them.
+Each entry is polled about every **15 seconds** (5–300 configurable): firmware, routes (`ain`), volume, mute, and bass/treble when EQ is on. Commands are sent one at a time. If firmware, routes, volume, or mute do not answer, the chassis is marked unavailable. After a turn on/off or source change, that chassis is re-read. The linked switch is re-read only when the change routed the matrix. Unsolicited `0t` frames update state when the hardware sends them, except a stale volume frame right after a write.
 
 A diagnostic **UDP activity** sensor logs SET commands, replies, and `0t` frames (not routine GET polls).
 
@@ -89,7 +89,7 @@ Amp zones are speakers (on/off, volume, source). Put play/pause / browse on the 
 3. Download **Control4 Audio**, then **restart** Home Assistant
 4. **Settings → Devices & Services → Add Integration → Control4 Audio** (`c4_audio`)
 
-HACS follows **GitHub Releases** (`v1.0.11`, …), not the tip of `main`.
+HACS follows **GitHub Releases** (`v1.0.12`, …), not the tip of `main`.
 
 ### Manual install
 
@@ -104,8 +104,10 @@ Brand icons for HA 2026.3+ live under `custom_components/c4_audio/brand/`.
 1. Pick the chassis (discovery or IP) and hardware type  
 2. **Inputs** — one name per jack; leave blank to skip in source lists  
 3. **Amp outputs** — name + room (area); blank name = no entity  
-4. **Switch outputs** — Output 1…16 names only (no room picker); stay in the switch area  
+4. **Switch outputs** — Output 1…16 names only (no room picker). They follow the switch area unless you assign one later  
 5. Defaults are fine for volume, polling, and timeouts — change later under **Configure → Settings**
+
+The room chosen during setup is applied only while the amp zone entity has no area. A room you set later in Home Assistant is kept. Switch outputs are not forced back onto the switch area.
 
 Named zones/outputs are `media_player`s. Each also gets a **Source** `select` entity on the device page.
 
@@ -132,8 +134,8 @@ Expose **All zones** to Alexa, or call the buttons / services from automations.
 |---|---|
 | `c4_audio.turn_on_all` | Turn on every enabled zone that is off (keeps volume on rooms already playing). Without `host`, **amps only**. |
 | `c4_audio.turn_off_all` | Mute and disconnect every enabled zone. Without `host`, **amps only**. Pass the switch IP to include named switch outputs. |
-| `c4_audio.set_route` | `output` + `input` (0 disconnects) on one chassis |
-| `c4_audio.send_command` | Raw body, e.g. `c4.amp.out 01 03` |
+| `c4_audio.set_route` | `output` + `input` (0 disconnects) on one chassis. `host` is required when more than one chassis is installed. |
+| `c4_audio.send_command` | Raw body, e.g. `c4.amp.out 01 03`. `host` is required when more than one chassis is installed. |
 
 Example Music dashboard (WiiM + amp zones): [examples/ha-dashboard](examples/ha-dashboard).
 
@@ -171,7 +173,7 @@ Use the entity ID from **Settings → Devices → your amp → UDP activity**.
 | Tone | `bassgain` / `trebgain` number entities |
 | Poll | `ain`, `avol`, `amut`, `abss`, `atrb`, `c4.sy.fwv` |
 
-Do **not** send `chvolmax` on zone off — 16AMP3 firmware snaps live volume to the cap. AMP108 gets `psave 00` only when a zone turns on (not on Home Assistant startup). 16AMP3 returns `n01` for that command.
+Do **not** send `chvolmax` on zone off — 16AMP3 firmware snaps live volume to the cap. AMP108 gets `psave 00` when a zone turns on, or once for All on (not on Home Assistant startup, and not once per zone). 16AMP3 returns `n01` for that command.
 
 ### Switch (`c4.asw`)
 

@@ -71,6 +71,21 @@ def visible_names(names: list[str]) -> list[str]:
     return [name for name in names if name != SKIP_NAME]
 
 
+def volume_reading_is_stale(
+    *,
+    now: float,
+    commanded_at: float | None,
+    commanded: int | None,
+    decoded: int,
+    hold_s: float = 2.5,
+    threshold: int = 5,
+) -> bool:
+    """True when a fresh reading still shows the pre-command volume."""
+    if commanded_at is None or commanded is None:
+        return False
+    return (now - commanded_at) < hold_s and abs(decoded - commanded) >= threshold
+
+
 def clamp_volume(percent: int, max_volume: int) -> int:
     """Keep a 0–100 volume at or below the software cap. Never send chvolmax."""
     cap = max(0, min(100, int(max_volume)))

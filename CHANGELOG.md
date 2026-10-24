@@ -4,6 +4,17 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 
 HACS shows the GitHub **release tag** (not a git commit hash). Each published version is a GitHub release named `v1.0.0`, `v1.0.1`, and so on.
 
+## [1.0.12]
+
+- Send one UDP command at a time, and reopen the socket if it dies
+- Do not update Home Assistant state when a command gets no reply
+- Volume up/down and the slider turn an off zone on from the turn-on volume, or from the level you set
+- Ignore a stale volume status frame for a few seconds after a write
+- Mark the chassis unavailable when route, volume, or mute polls time out
+- `set_route` and `send_command` require `host` when more than one chassis is configured, and reject jacks that chassis does not have
+- Keep areas you set in Home Assistant; apply the setup room only when a zone has none
+- Wake AMP108 power-save once per All on, and re-read the linked switch only after a matrix route
+
 ## [1.0.11]
 
 - Entity unique IDs follow the chassis identity (not the IP), and existing entities are migrated so a DHCP change keeps names, areas, and history
@@ -76,6 +87,7 @@ First SemVer release (replaces the short integer tags 1–7).
 - Discovery lists only Control4 amps and the 16×16 switch
 - Switch hardware label is C4-16ZAMSV3-B
 
+[1.0.12]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.11...v1.0.12
 [1.0.11]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.10...v1.0.11
 [1.0.10]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.9...v1.0.10
 [1.0.9]: https://github.com/heatvent/ha-c4-audio/compare/v1.0.8...v1.0.9

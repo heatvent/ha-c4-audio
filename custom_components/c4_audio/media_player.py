@@ -53,12 +53,9 @@ class C4ZoneMediaPlayer(CoordinatorEntity[C4AudioCoordinator], MediaPlayerEntity
             self.async_on_remove(switch.async_add_listener(self._handle_switch_update))
         registry = er.async_get(self.hass)
         entity_entry = registry.async_get(self.entity_id)
-        if self.coordinator.is_matrix:
-            if entity_entry is not None and entity_entry.area_id is not None:
-                registry.async_update_entity(self.entity_id, area_id=None)
-        else:
+        if not self.coordinator.is_matrix:
             area_id = self.coordinator.zone_area_id(self._zone)
-            if area_id and (entity_entry is None or entity_entry.area_id != area_id):
+            if area_id and entity_entry is not None and entity_entry.area_id is None:
                 registry.async_update_entity(self.entity_id, area_id=area_id)
 
     @callback

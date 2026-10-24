@@ -32,9 +32,11 @@ class C4UdpProtocol(asyncio.DatagramProtocol):
         self,
         on_packet: Callable[[ParsedPacket], None],
         on_unparsed: Callable[[bytes, object], None] | None = None,
+        on_lost: Callable[[], None] | None = None,
     ) -> None:
         self._on_packet = on_packet
         self._on_unparsed = on_unparsed
+        self._on_lost = on_lost
 
     def datagram_received(self, data: bytes, addr) -> None:  # noqa: ANN001
         parsed = parse_packet(data)
@@ -46,6 +48,17 @@ class C4UdpProtocol(asyncio.DatagramProtocol):
             return
         _LOGGER.debug("UDP from %s: %s", addr, parsed.raw)
         self._on_packet(parsed)
+
+    def error_received(self, exc: Exception) -> None:
+        _LOGGER.warning("UDP error: %s", exc)
+        if self._on_lost is not None:
+            self._on_lost()
+
+    def connection_lost(self, exc: Exception | None) -> None:
+        if exc is not None:
+            _LOGGER.warning("UDP connection lost: %s", exc)
+        if self._on_lost is not None:
+            self._on_lost()
 
 
 class C4UdpClient:
@@ -61,6 +74,8 @@ class C4UdpClient:
         self._activity_listeners: list[Callable[[], None]] = []
         self._activity: deque[str] = deque(maxlen=ACTIVITY_MAX)
         self._lock = asyncio.Lock()
+        self._closing = False
+        self._dropping = False
 
     def add_listener(self, callback: Callable[[ParsedPacket], None]) -> None:
         self._listeners.append(callback)
@@ -89,24 +104,52 @@ class C4UdpClient:
         self._note(f"{_stamp()}  ←  {self.host}  unparsed: {preview}", noisy=True)
         _LOGGER.warning("UDP from %s ignored (unparsed): %r", addr, data[:120])
 
-    async def async_start(self) -> None:
+    async def _open_socket(self) -> None:
         loop = asyncio.get_running_loop()
         transport, _protocol = await loop.create_datagram_endpoint(
-            lambda: C4UdpProtocol(self._handle_packet, self._unparsed),
+            lambda: C4UdpProtocol(self._handle_packet, self._unparsed, self._socket_lost),
             remote_addr=(self.host, self.port),
             family=socket.AF_INET,
         )
         self._transport = transport
+        self._closing = False
+
+    def _drop_socket(self, *, cancel: bool) -> None:
+        if self._dropping:
+            return
+        self._dropping = True
+        try:
+            transport = self._transport
+            self._transport = None
+            pending = list(self._pending.values())
+            self._pending.clear()
+            self._pending_noisy.clear()
+            if transport is not None:
+                transport.close()
+            for future in pending:
+                if future.done():
+                    continue
+                if cancel:
+                    future.cancel()
+                else:
+                    future.set_exception(ConnectionError("Control4 UDP socket closed"))
+        finally:
+            self._dropping = False
+
+    def _socket_lost(self) -> None:
+        if self._closing:
+            return
+        self._drop_socket(cancel=False)
+
+    async def async_start(self) -> None:
+        async with self._lock:
+            if self._transport is None:
+                await self._open_socket()
 
     async def async_stop(self) -> None:
-        if self._transport is not None:
-            self._transport.close()
-            self._transport = None
-        for future in self._pending.values():
-            if not future.done():
-                future.cancel()
-        self._pending.clear()
-        self._pending_noisy.clear()
+        async with self._lock:
+            self._closing = True
+            self._drop_socket(cancel=True)
 
     def _handle_packet(self, packet: ParsedPacket) -> None:
         if packet.kind == "reply" and packet.sequence in self._pending:
@@ -124,11 +167,11 @@ class C4UdpClient:
                 _LOGGER.exception("Error in UDP listener")
 
     async def async_send(self, prefix: str, body: str) -> ParsedPacket | None:
-        if self._transport is None:
-            raise RuntimeError("UDP client is not started")
-
+        """Send one frame and wait for its reply before another command may start."""
         quiet = prefix.startswith("0g")
         async with self._lock:
+            if self._transport is None:
+                await self._open_socket()
             seq = self._seq
             self._seq = next_sequence(self._seq)
             loop = asyncio.get_running_loop()
@@ -138,16 +181,19 @@ class C4UdpClient:
             frame = build_frame(prefix, seq, body)
             text = _ascii_frame(frame)
             self._note(f"{_stamp()}  →  {self.host}  {text}", noisy=not quiet)
+            assert self._transport is not None
             self._transport.sendto(frame)
-
-        try:
-            return await asyncio.wait_for(future, timeout=self.timeout)
-        except TimeoutError:
-            self._pending.pop(seq, None)
-            noisy = self._pending_noisy.pop(seq, not quiet)
-            self._note(f"{_stamp()}  ×  {self.host}  timeout {prefix} {body}", noisy=True)
-            _LOGGER.warning("UDP timeout waiting for %s %s", prefix, body)
-            return None
+            try:
+                return await asyncio.wait_for(future, timeout=self.timeout)
+            except TimeoutError:
+                self._pending.pop(seq, None)
+                self._pending_noisy.pop(seq, None)
+                self._note(f"{_stamp()}  ×  {self.host}  timeout {prefix} {body}", noisy=True)
+                _LOGGER.warning("UDP timeout waiting for %s %s", prefix, body)
+                return None
+            except ConnectionError:
+                _LOGGER.warning("UDP socket closed waiting for %s %s", prefix, body)
+                return None
 
 
 async def async_probe_firmware(host: str, port: int, timeout: float) -> str | None:

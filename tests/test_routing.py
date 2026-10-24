@@ -9,14 +9,15 @@ from routing import (
     KIND_LOCAL,
     KIND_SWITCH,
     clamp_volume,
-    ha_volume_to_percent,
     displayed_amp_source,
     enabled_indexes,
+    ha_volume_to_percent,
     merged_source_list,
     parse_feeds,
     parse_zone_map,
     resolve_source_choice,
     split_names,
+    volume_reading_is_stale,
 )
 
 
@@ -38,6 +39,13 @@ def test_clamp_volume_respects_software_cap():
     assert clamp_volume(10, 40) == 10
     assert clamp_volume(-5, 100) == 0
     assert clamp_volume(120, 100) == 100
+
+
+def test_volume_reading_hold_ignores_stale_jump():
+    assert volume_reading_is_stale(now=10.0, commanded_at=9.0, commanded=10, decoded=100)
+    assert not volume_reading_is_stale(now=10.0, commanded_at=9.0, commanded=10, decoded=12)
+    assert not volume_reading_is_stale(now=13.0, commanded_at=9.0, commanded=10, decoded=100)
+    assert not volume_reading_is_stale(now=10.0, commanded_at=None, commanded=None, decoded=100)
 
 
 def test_ha_volume_slider_vs_percent_step():

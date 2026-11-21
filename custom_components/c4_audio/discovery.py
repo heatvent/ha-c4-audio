@@ -7,9 +7,9 @@ import socket
 from dataclasses import dataclass
 
 try:
-    from .const import MODEL_AMP108, MODEL_AMP16, MODEL_AMP16ZONE, MODEL_MATRIX16
+    from .const import MODEL_AMP108, MODEL_AMP16, MODEL_MATRIX16
 except ImportError:  # running tests without the HA package
-    from const import MODEL_AMP108, MODEL_AMP16, MODEL_AMP16ZONE, MODEL_MATRIX16
+    from const import MODEL_AMP108, MODEL_AMP16, MODEL_MATRIX16
 
 SDDP_MULTICAST = "239.255.255.250"
 SDDP_PORT = 1902

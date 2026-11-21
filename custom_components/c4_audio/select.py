@@ -9,7 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import device_info_for
-from .const import DOMAIN, SKIP_NAME
+from .const import SKIP_NAME
 from .coordinator import C4AudioCoordinator
 from .entity_ids import entity_unique_id
 
@@ -19,7 +19,7 @@ SOURCE_OFF = "Off"
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    coordinator: C4AudioCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: C4AudioCoordinator = entry.runtime_data
     async_add_entities(
         C4SourceSelect(coordinator, zone) for zone in coordinator.enabled_zones
     )

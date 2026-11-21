@@ -7,7 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_SWITCH_ENTRY_ID, DOMAIN
+from .const import CONF_SWITCH_ENTRY_ID
 from .coordinator import C4AudioCoordinator
 
 TO_REDACT = {CONF_HOST}
@@ -16,7 +16,7 @@ TO_REDACT = {CONF_HOST}
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict:
-    coordinator: C4AudioCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: C4AudioCoordinator = entry.runtime_data
     return {
         "entry": async_redact_data(entry.as_dict(), TO_REDACT),
         "model": coordinator.model_id,

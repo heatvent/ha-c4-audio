@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -31,7 +31,6 @@ from .const import (
     DEFAULT_SWITCH_FEEDS,
     DEFAULT_SWITCH_ON_VOLUME,
     DEFAULT_UDP_TIMEOUT,
-    DOMAIN,
     MODELS,
     SKIP_NAME,
 )
@@ -97,6 +96,7 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=entry,
             name=entry.title,
             update_interval=timedelta(seconds=int(poll)),
         )
@@ -199,8 +199,11 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
         )
         if not entry_id:
             return None
-        coordinator = self.hass.data.get(DOMAIN, {}).get(entry_id)
-        if coordinator is None or not getattr(coordinator, "is_matrix", False):
+        switch_entry = self.hass.config_entries.async_get_entry(entry_id)
+        if switch_entry is None or switch_entry.state is not ConfigEntryState.LOADED:
+            return None
+        coordinator = getattr(switch_entry, "runtime_data", None)
+        if not isinstance(coordinator, C4AudioCoordinator) or not coordinator.is_matrix:
             return None
         return coordinator
 
@@ -504,7 +507,9 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
 
     @callback
     def _on_udp_activity(self) -> None:
-        self.hass.loop.call_soon_threadsafe(self.async_set_updated_data, self.state)
+        # async_update_listeners, not async_set_updated_data: the latter reschedules the
+        # poll, so a chatty chassis would keep pushing the next full GET back forever.
+        self.async_update_listeners()
 
     @callback
     def _on_packet(self, packet: ParsedPacket) -> None:
@@ -531,4 +536,4 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
                 self._remember_volume(zone, decoded)
         else:
             return
-        self.hass.loop.call_soon_threadsafe(self.async_set_updated_data, self.state)
+        self.async_update_listeners()

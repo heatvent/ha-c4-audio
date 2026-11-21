@@ -4,6 +4,14 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 
 HACS shows the GitHub **release tag** (not a git commit hash). Each published version is a GitHub release named `v1.0.0`, `v1.0.1`, and so on.
 
+## [1.0.13]
+
+- Keep the regular poll on schedule. Status frames from the chassis no longer postpone it, so firmware, bass/treble and availability stay current even while a keypad or volume ramp is sending updates
+- Close the UDP socket only after every entity unloaded cleanly
+- Pass the config entry to the coordinator explicitly (required by newer Home Assistant)
+- Services are available as soon as Home Assistant starts, so automations validate before the chassis is reachable
+- CI runs the test suite, with new setup/unload and polling tests
+
 ## [1.0.12]
 
 - Send one UDP command at a time, and reopen the socket if it dies

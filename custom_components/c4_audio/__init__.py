@@ -5,13 +5,14 @@ from __future__ import annotations
 import logging
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .const import CONF_IDENT, DOMAIN, MODELS, PLATFORMS
@@ -19,6 +20,8 @@ from .coordinator import C4AudioCoordinator
 from .entity_ids import migrated_unique_id, stable_instance_id
 
 _LOGGER = logging.getLogger(__name__)
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 SERVICE_SEND_COMMAND = "send_command"
 SERVICE_SET_ROUTE = "set_route"
@@ -29,8 +32,16 @@ ATTR_OUTPUT = "output"
 ATTR_INPUT = "input"
 
 
+type C4AudioConfigEntry = ConfigEntry[C4AudioCoordinator]
+
+
 def _coordinators(hass: HomeAssistant) -> list[C4AudioCoordinator]:
-    return list(hass.data.get(DOMAIN, {}).values())
+    return [
+        entry.runtime_data
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.state is ConfigEntryState.LOADED
+        and isinstance(getattr(entry, "runtime_data", None), C4AudioCoordinator)
+    ]
 
 
 def _match(hass: HomeAssistant, host: str | None, *, amps_only: bool = False) -> list[C4AudioCoordinator]:
@@ -54,8 +65,13 @@ def _one_device(hass: HomeAssistant, host: str | None, service: str) -> C4AudioC
     return matched[0]
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    hass.data.setdefault(DOMAIN, {})
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register services once, so automations validate even before an entry loads."""
+    _register_services(hass)
+    return True
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: C4AudioConfigEntry) -> bool:
     coordinator = C4AudioCoordinator(hass, entry)
     await coordinator.async_start()
     try:
@@ -63,12 +79,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except UpdateFailed as err:
         await coordinator.async_shutdown()
         raise ConfigEntryNotReady(str(err)) from err
-    hass.data[DOMAIN][entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     await _async_migrate_entity_unique_ids(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    _register_services(hass)
     return True
 
 
@@ -105,13 +120,11 @@ async def _async_migrate_entity_unique_ids(hass: HomeAssistant, entry: ConfigEnt
     await er.async_migrate_entries(hass, entry.entry_id, _migrator)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: C4AudioConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    coordinator: C4AudioCoordinator = hass.data[DOMAIN].pop(entry.entry_id)
-    await coordinator.async_shutdown()
-    if unload_ok and not hass.data[DOMAIN]:
-        for service in (SERVICE_SEND_COMMAND, SERVICE_SET_ROUTE, SERVICE_TURN_OFF_ALL, SERVICE_TURN_ON_ALL):
-            hass.services.async_remove(DOMAIN, service)
+    if unload_ok:
+        # Close the socket only once every platform let go; otherwise entities stay live.
+        await entry.runtime_data.async_shutdown()
     return unload_ok
 
 

@@ -10,16 +10,47 @@ on:
 permissions: {}
 
 jobs:
-  hassfest:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: home-assistant/actions/hassfest@master
-
-  hacs:
+  validate-hacs:
+    name: HACS
     runs-on: ubuntu-latest
     steps:
       - name: HACS validation
         uses: hacs/action@main
         with:
           category: integration
+
+  validate-hassfest:
+    name: Hassfest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Hassfest treats a top-level tests/ folder as a core test layout.
+      - name: Remove tests
+        run: rm -rf tests
+
+      - name: Hassfest validation
+        uses: home-assistant/actions/hassfest@master
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install test dependencies
+        run: pip install pytest-homeassistant-custom-component
+
+      - name: Run tests
+        run: python -m pytest -q

@@ -4,6 +4,14 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 
 HACS shows the GitHub **release tag** (not a git commit hash). Each published version is a GitHub release named `v1.0.0`, `v1.0.1`, and so on.
 
+## [2.0.1]
+
+Tested on a real C4-8AMP1-B (firmware 03.24.45): identification, wake, routing to all four inputs, mute, volume, bass, treble, balance, and input level.
+
+- Adding an amp by hand works while Home Assistant shows a discovery card for it
+- C4-8AMP1-B: the input level slider stops at 0 dB, because the amp ignores a higher level
+- C4-8AMP1-B: a zone set to 0% no longer shows 1% (the amp stores 0% as 1%)
+
 ## [2.0.0]
 
 ### Breaking

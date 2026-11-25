@@ -671,3 +671,48 @@ async def test_reconfigure(hass: HomeAssistant, amp: FakeAmp, identity, outcome)
     assert entry.state is ConfigEntryState.LOADED
     assert entry.runtime_data.host == entry.data["host"]
     assert ids == {e.entity_id for e in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)}
+
+
+async def test_manual_setup_is_not_blocked_by_a_discovery_card(hass: HomeAssistant, amp: FakeAmp) -> None:
+    class Info:
+        ip = "192.0.2.5"
+        macaddress = "000fff000001"
+
+    found = ProbeIdentity("1", "v1_8chanamp:c4-8amp1-b:x", MODEL_8AMP1)
+    with probe(found), patch(FLOW + "async_sddp_search", AsyncMock(return_value=[])):
+        await hass.config_entries.flow.async_init(DOMAIN, context={"source": "dhcp"}, data=Info())
+        flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+        result = await hass.config_entries.flow.async_configure(
+            flow["flow_id"], {"name": "Spare", "host": "192.0.2.5", "port": 8750, "model": MODEL_AMP16}
+        )
+    assert result["step_id"] == "inputs"
+    assert len(result["data_schema"].schema) == 4  # detected, not the model picked in the form
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"input_1_name": "WiiM"})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"zone_1_name": "Test"})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    assert hass.config_entries.flow.async_progress() == []  # the card is gone
+
+
+async def test_zero_volume_stays_zero_when_the_amp_stores_one(hass: HomeAssistant, amp: FakeAmp) -> None:
+    amp.out[0], amp.mute[0] = 1, 0
+    events = async_capture_events(hass, EVENT_EXTERNAL_CHANGE)
+    entry = await setup(hass)
+    coordinator = entry.runtime_data
+    await coordinator.async_set_volume(1, 0.0)
+    amp.vol[0] = 1
+    coordinator._commanded_at.clear()
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.state.zones[1].volume == 0
+    assert events == []
+    await coordinator.async_adjust_volume(1, 1)
+    await coordinator.async_refresh()
+    assert coordinator.state.zones[1].volume == 1  # a real 1% is still 1%
+
+
+@pytest.mark.parametrize(("model", "highest"), [(MODEL_8AMP1, 0), (MODEL_AMP16, 6)])
+async def test_input_level_range(hass: HomeAssistant, amp: FakeAmp, model, highest) -> None:
+    await setup(hass, model=model, options={"experimental_controls": True})
+    state = hass.states.get(entity(hass, "number", "input_1_gain"))
+    assert (state.attributes["min"], state.attributes["max"]) == (-6, highest)

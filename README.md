@@ -58,7 +58,7 @@ triggers:
 
 ### Experimental controls
 
-**Configure → Settings → Show balance and input level** adds a balance slider per zone and a level slider per named input. Both are confirmed on the 16AMP3 for one step (balance +1, level -1 dB); the full range and the 4-zone amps are not tested, so each change is read back and an amp that ignores it reports an error.
+**Configure → Settings → Show balance and input level** adds a balance slider per zone and a level slider per named input. Balance is confirmed on the C4-8AMP1-B (-10 to +10) and for one step on the 16AMP3. Input level is confirmed on the C4-8AMP1-B (-6 to 0 dB; it has no boost) and for -1 dB on the 16AMP3. Each change is read back and an amp that ignores it reports an error.
 
 A diagnostic **UDP activity** sensor logs SET commands, replies, and `0t` frames (not routine GET polls).
 

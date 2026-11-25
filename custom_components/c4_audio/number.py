@@ -75,7 +75,6 @@ class C4InputGainNumber(CoordinatorEntity[C4AudioCoordinator], NumberEntity):
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
     _attr_native_min_value = -INPUT_GAIN_LIMIT
-    _attr_native_max_value = INPUT_GAIN_LIMIT
     _attr_native_step = 1
     _attr_native_unit_of_measurement = "dB"
     _attr_mode = NumberMode.SLIDER
@@ -84,6 +83,7 @@ class C4InputGainNumber(CoordinatorEntity[C4AudioCoordinator], NumberEntity):
     def __init__(self, coordinator: C4AudioCoordinator, source: int) -> None:
         super().__init__(coordinator)
         self._source = source
+        self._attr_native_max_value = coordinator.model["input_gain_max"]
         self._attr_unique_id = entity_unique_id(coordinator.entry, f"input_{source}_gain")
         self._attr_device_info = device_info_for(coordinator)
 

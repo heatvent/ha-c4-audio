@@ -1,4 +1,4 @@
-"""All on / All off buttons on each amp or switch device."""
+"""All on / All off buttons on each amp device."""
 
 from __future__ import annotations
 

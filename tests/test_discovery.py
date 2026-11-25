@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "c4_audio"))
 
-from const import MODEL_AMP16, MODEL_MATRIX16
+from const import MODEL_8AMP1, MODEL_AMP108, MODEL_AMP16
 from discovery import identity_from_info, parse_sddp_packet, suggest_model
 
 
@@ -26,7 +26,7 @@ def test_parse_amp_sddp():
     assert device.suggested_model == MODEL_AMP16
 
 
-def test_parse_switch_sddp():
+def test_skip_audio_switch():
     packet = (
         'NOTIFY ALIVE SDDP/1.0\r\n'
         'From: "192.168.68.80:1902"\r\n'
@@ -35,9 +35,8 @@ def test_parse_switch_sddp():
         'Model: "AVM-16S1-B"\r\n'
         "\r\n"
     )
-    device = parse_sddp_packet(packet)
-    assert device is not None
-    assert device.suggested_model == MODEL_MATRIX16
+    assert parse_sddp_packet(packet) is None
+    assert suggest_model("c4:v3_avswitch", "C4-16ZAMSV3-B", "c4-16zamsv3-b-000fff123456") is None
 
 
 def test_skip_non_c4_audio():
@@ -82,4 +81,13 @@ def test_identity_prefers_info_string():
 
 
 def test_suggest_model_amp108():
-    assert suggest_model("c4:c4amp", "C4-AMP108-1B", "amp108") is not None
+    assert suggest_model("c4:c4amp", "C4-AMP108-1B", "amp108") == MODEL_AMP108
+
+
+def test_suggest_model_8amp1():
+    # The search type from Control4's own amp3_4Ch_control4 driver.
+    assert suggest_model("c4:v1_8chanamp:c4-8AMP1-B", "C4-8AMP1-B", "x") == MODEL_8AMP1
+
+
+def test_suggest_older_16_channel_amps():
+    assert suggest_model("c4:16chanamp:avm-16a1-b", "C4-16AMP2-B", "x") == MODEL_AMP16

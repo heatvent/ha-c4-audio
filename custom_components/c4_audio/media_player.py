@@ -1,4 +1,4 @@
-"""Media player entities — one per enabled zone or switch output."""
+"""Media player entities — one per enabled zone."""
 
 from __future__ import annotations
 
@@ -8,13 +8,13 @@ from homeassistant.components.media_player import (
     MediaPlayerState,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import device_info_for
 from .coordinator import C4AudioCoordinator
+from .entity import adopt_zone_area
 from .entity_ids import entity_unique_id
 
 
@@ -47,19 +47,7 @@ class C4ZoneMediaPlayer(CoordinatorEntity[C4AudioCoordinator], MediaPlayerEntity
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
-        switch = self.coordinator.linked_switch()
-        if switch is not None:
-            self.async_on_remove(switch.async_add_listener(self._handle_switch_update))
-        registry = er.async_get(self.hass)
-        entity_entry = registry.async_get(self.entity_id)
-        if not self.coordinator.is_matrix:
-            area_id = self.coordinator.zone_area_id(self._zone)
-            if area_id and entity_entry is not None and entity_entry.area_id is None:
-                registry.async_update_entity(self.entity_id, area_id=area_id)
-
-    @callback
-    def _handle_switch_update(self) -> None:
-        self.async_write_ha_state()
+        adopt_zone_area(self.hass, self.coordinator, self.entity_id, self._zone)
 
     @property
     def name(self) -> str:
@@ -89,7 +77,7 @@ class C4ZoneMediaPlayer(CoordinatorEntity[C4AudioCoordinator], MediaPlayerEntity
     @property
     def volume_level(self) -> float:
         if self._zone_state.source <= 0:
-            return self.coordinator.on_volume / 100.0
+            return self.coordinator.on_volume(self._zone) / 100.0
         return self._zone_state.volume / 100.0
 
     @property
@@ -98,23 +86,13 @@ class C4ZoneMediaPlayer(CoordinatorEntity[C4AudioCoordinator], MediaPlayerEntity
 
     @property
     def extra_state_attributes(self) -> dict:
-        attrs = {
+        return {
             "zone": self._zone,
             "host": self.coordinator.host,
             "model": self.coordinator.model_id,
             "input_index": self._zone_state.source,
             "firmware": self.coordinator.state.firmware,
         }
-        switch = self.coordinator.linked_switch()
-        if switch is not None:
-            feeds = self.coordinator.switch_feeds
-            amp_in = self._zone_state.source
-            if amp_in in feeds:
-                sw_out = feeds[amp_in]
-                attrs["switch_output"] = sw_out
-                attrs["switch_input"] = switch.state.zones.get(sw_out).source if sw_out in switch.state.zones else None
-                attrs["switch_host"] = switch.host
-        return attrs
 
     async def async_turn_on(self) -> None:
         await self.coordinator.async_turn_on(self._zone)

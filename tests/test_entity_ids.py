@@ -22,11 +22,11 @@ def test_current_host_moves_to_ident():
 def test_previous_dhcp_address_still_matches_known_suffix():
     assert (
         migrated_unique_id(
-            "10.0.0.4_output_16_source",
-            stable_id="c4-switch",
+            "10.0.0.4_zone_8_source",
+            stable_id="c4-amp-serial",
             host="10.0.0.9",
         )
-        == "c4-switch_output_16_source"
+        == "c4-amp-serial_zone_8_source"
     )
 
 

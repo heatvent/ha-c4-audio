@@ -3,14 +3,14 @@
     "step": {
       "discover": {
         "title": "Found Control4 audio devices",
-        "description": "Only Control4 amps and the 16x16 switch are listed. Sony, WiiM, and other SDDP gear is ignored. If your chassis is missing, choose Enter IP address manually.",
+        "description": "Only Control4 amps are listed. Sony, WiiM, and other SDDP gear is ignored. If your chassis is missing, choose Enter IP address manually.",
         "data": {
           "device": "Device"
         }
       },
       "user": {
         "title": "Control4 Audio",
-        "description": "IP address and hardware type for this chassis. Inputs are next, then outputs.",
+        "description": "IP address and hardware type for this amp. Inputs are next, then zones.",
         "data": {
           "name": "Name",
           "host": "IP address",
@@ -20,7 +20,7 @@
       },
       "inputs": {
         "title": "Name inputs",
-        "description": "You are naming INPUT jacks. Leave a box empty to skip that input. Named inputs become the source list on each amp zone or switch output.",
+        "description": "You are naming INPUT jacks. Leave a box empty to skip that input. Named inputs become the source list on each amp zone.",
         "data": {
           "input_1_name": "",
           "input_2_name": "",
@@ -29,78 +29,84 @@
           "input_5_name": "",
           "input_6_name": "",
           "input_7_name": "",
-          "input_8_name": "",
-          "input_9_name": "",
-          "input_10_name": "",
-          "input_11_name": "",
-          "input_12_name": "",
-          "input_13_name": "",
-          "input_14_name": "",
-          "input_15_name": "",
-          "input_16_name": ""
+          "input_8_name": ""
         }
       },
       "outputs": {
-        "title": "Name outputs",
-        "description": "You are naming {output_kind}. Leave a name empty to skip that output. {area_help}",
+        "title": "Name zones",
+        "description": "You are naming speaker zones. Leave a name empty to skip that zone. Choose a room for each named zone. Turn-on volume is optional; empty uses the amp's turn-on volume.",
         "data": {
           "zone_1_name": "",
           "zone_1_area": "",
+          "zone_1_volume": "Zone 1 turn-on volume",
           "zone_2_name": "",
           "zone_2_area": "",
+          "zone_2_volume": "Zone 2 turn-on volume",
           "zone_3_name": "",
           "zone_3_area": "",
+          "zone_3_volume": "Zone 3 turn-on volume",
           "zone_4_name": "",
           "zone_4_area": "",
+          "zone_4_volume": "Zone 4 turn-on volume",
           "zone_5_name": "",
           "zone_5_area": "",
+          "zone_5_volume": "Zone 5 turn-on volume",
           "zone_6_name": "",
           "zone_6_area": "",
+          "zone_6_volume": "Zone 6 turn-on volume",
           "zone_7_name": "",
           "zone_7_area": "",
+          "zone_7_volume": "Zone 7 turn-on volume",
           "zone_8_name": "",
           "zone_8_area": "",
-          "zone_9_name": "",
-          "zone_9_area": "",
-          "zone_10_name": "",
-          "zone_10_area": "",
-          "zone_11_name": "",
-          "zone_11_area": "",
-          "zone_12_name": "",
-          "zone_12_area": "",
-          "zone_13_name": "",
-          "zone_13_area": "",
-          "zone_14_name": "",
-          "zone_14_area": "",
-          "zone_15_name": "",
-          "zone_15_area": "",
-          "zone_16_name": "",
-          "zone_16_area": ""
+          "zone_8_volume": "Zone 8 turn-on volume"
+        }
+      },
+      "confirm": {
+        "title": "Control4 amp found",
+        "description": "{model} at {host}. Give it a name, then name its inputs and zones.",
+        "data": {
+          "name": "Name"
+        }
+      },
+      "reconfigure": {
+        "title": "Change the address",
+        "description": "Use this when the amp has a new IP address. Entities and settings are kept.",
+        "data": {
+          "host": "IP address",
+          "port": "UDP port"
         }
       }
     },
     "error": {
-      "cannot_connect": "No UDP reply on port 8750. Check the IP and that Director is not blocking the chassis."
+      "cannot_connect": "No UDP reply on port 8750. Check the IP and that Director is not blocking the chassis.",
+      "not_an_amp": "That device answered, but not as a Control4 amp. The audio switch is not supported."
     },
     "abort": {
       "already_configured": "That device is already set up.",
-      "not_audio_chassis": "That Control4 device is not an amp or audio switch."
-    }
+      "not_audio_chassis": "That Control4 device is not an amp.",
+      "wrong_device": "A different Control4 amp answered at that address.",
+      "reconfigure_successful": "The address was updated."
+    },
+    "flow_title": "{name}"
   },
   "options": {
+    "abort": {
+      "not_an_amp": "This entry is not a supported amp. Delete it."
+    },
     "step": {
       "init": {
         "title": "Configure Control4 Audio",
-        "description": "Name inputs and outputs here. Volume, polling, timeout, and switch link are under Settings.",
+        "description": "Name inputs and zones here. Volume, polling, and timeout are under Settings.",
         "menu_options": {
           "inputs": "Inputs",
-          "outputs": "Outputs",
-          "settings": "Volume, polling, and switch link"
+          "outputs": "Zones",
+          "settings": "Volume and polling"
         }
       },
       "inputs": {
         "title": "Name inputs",
-        "description": "You are naming INPUT jacks. Leave a box empty to skip that input. Named inputs become the source list on each amp zone or switch output.",
+        "description": "You are naming INPUT jacks. Leave a box empty to skip that input. Named inputs become the source list on each amp zone.",
         "data": {
           "input_1_name": "",
           "input_2_name": "",
@@ -109,68 +115,119 @@
           "input_5_name": "",
           "input_6_name": "",
           "input_7_name": "",
-          "input_8_name": "",
-          "input_9_name": "",
-          "input_10_name": "",
-          "input_11_name": "",
-          "input_12_name": "",
-          "input_13_name": "",
-          "input_14_name": "",
-          "input_15_name": "",
-          "input_16_name": ""
+          "input_8_name": ""
         }
       },
       "outputs": {
-        "title": "Name outputs",
-        "description": "You are naming {output_kind}. Leave a name empty to skip that output. {area_help}",
+        "title": "Name zones",
+        "description": "You are naming speaker zones. Leave a name empty to skip that zone. Choose a room for each named zone. Turn-on volume is optional; empty uses the amp's turn-on volume.",
         "data": {
           "zone_1_name": "",
           "zone_1_area": "",
+          "zone_1_volume": "Zone 1 turn-on volume",
           "zone_2_name": "",
           "zone_2_area": "",
+          "zone_2_volume": "Zone 2 turn-on volume",
           "zone_3_name": "",
           "zone_3_area": "",
+          "zone_3_volume": "Zone 3 turn-on volume",
           "zone_4_name": "",
           "zone_4_area": "",
+          "zone_4_volume": "Zone 4 turn-on volume",
           "zone_5_name": "",
           "zone_5_area": "",
+          "zone_5_volume": "Zone 5 turn-on volume",
           "zone_6_name": "",
           "zone_6_area": "",
+          "zone_6_volume": "Zone 6 turn-on volume",
           "zone_7_name": "",
           "zone_7_area": "",
+          "zone_7_volume": "Zone 7 turn-on volume",
           "zone_8_name": "",
           "zone_8_area": "",
-          "zone_9_name": "",
-          "zone_9_area": "",
-          "zone_10_name": "",
-          "zone_10_area": "",
-          "zone_11_name": "",
-          "zone_11_area": "",
-          "zone_12_name": "",
-          "zone_12_area": "",
-          "zone_13_name": "",
-          "zone_13_area": "",
-          "zone_14_name": "",
-          "zone_14_area": "",
-          "zone_15_name": "",
-          "zone_15_area": "",
-          "zone_16_name": "",
-          "zone_16_area": ""
+          "zone_8_volume": "Zone 8 turn-on volume"
         }
       },
       "settings": {
         "title": "Settings",
-        "description": "Amp default turn-on volume is 10% so rooms do not come on loud. Maximum volume is a software cap. The switch stays at 100%.",
+        "description": "Amp default turn-on volume is 10% so rooms do not come on loud. Maximum volume is a software cap.",
         "data": {
           "on_volume": "Turn-on volume (%)",
           "max_volume": "Maximum volume (%)",
           "poll_interval": "Status poll interval (seconds)",
+          "active_poll_interval": "Status poll interval while a zone is on (seconds)",
           "udp_timeout": "UDP timeout (seconds)",
+          "remember_source": "Turn zones on with their last source",
           "enable_eq": "Show bass and treble sliders",
-          "switch_entry_id": "Matrix switch",
-          "switch_feeds": "Amp input = switch output"
+          "experimental_controls": "Show balance and input level (experimental)"
+        },
+        "data_description": {
+          "remember_source": "Off: zones always turn on with the first named input.",
+          "experimental_controls": "The commands are not confirmed on every amp. Each change is read back, and an amp that ignores it reports an error."
         }
       }
+    }
+  },
+  "entity": {
+    "media_player": {
+      "zone": {
+        "name": "Zone"
+      }
+    },
+    "number": {
+      "bass": {
+        "name": "Bass"
+      },
+      "treble": {
+        "name": "Treble"
+      },
+      "balance": {
+        "name": "Balance"
+      },
+      "input_gain": {
+        "name": "Input level"
+      }
+    },
+    "select": {
+      "source": {
+        "name": "Source"
+      }
+    },
+    "sensor": {
+      "udp_activity": {
+        "name": "UDP activity"
+      }
+    },
+    "switch": {
+      "all_zones": {
+        "name": "All zones"
+      }
+    },
+    "button": {
+      "all_on": {
+        "name": "All on"
+      },
+      "all_off": {
+        "name": "All off"
+      }
+    }
+  },
+  "services": {
+    "send_command": {
+      "name": "Send UDP command",
+      "description": "Send a raw Control4 serial-over-UDP body."
+    },
+    "set_route": {
+      "name": "Set route",
+      "description": "Route one output to an input on a chassis."
+    },
+    "turn_off_all": {
+      "name": "Turn off all zones",
+      "description": "Mute and disconnect enabled amp zones. Leave the amp empty for every amp."
+    },
+    "turn_on_all": {
+      "name": "Turn on all zones",
+      "description": "Turn on enabled amp zones that are off. Already-on rooms keep volume. Leave the amp empty for every amp."
     }
   }
 }

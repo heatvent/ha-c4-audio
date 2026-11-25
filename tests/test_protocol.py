@@ -7,7 +7,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components"
 
 from protocol import (
     AmpCommands,
-    DeviceCommands,
     build_frame,
     parse_packet,
     split_user_command,
@@ -24,7 +23,7 @@ def test_volume_round_trip_matches_amp108_capture():
 
 
 def test_set_output_frame():
-    prefix, body = AmpCommands.set_output(2, 1)
+    prefix, body = AmpCommands().set_output(2, 1)
     frame = build_frame(prefix, 0xE76C, body)
     assert frame == b"0se76c c4.amp.out 02 01\r\n"
 
@@ -43,17 +42,20 @@ def test_parse_reply_and_status():
 
 
 def test_turn_off_is_source_zero():
-    _prefix, body = AmpCommands.set_output(1, 0)
+    _prefix, body = AmpCommands().set_output(1, 0)
     assert body == "c4.amp.out 01 00"
 
 
-def test_switch_namespace_and_unity_volume():
-    cmds = DeviceCommands("c4.asw", "vol", "percent_hex")
-    _prefix, route = cmds.set_output(16, 4)
-    assert route == "c4.asw.out 10 04"
-    _prefix, vol = cmds.set_volume(1, 100)
-    assert vol == "c4.asw.vol 01 64"
-    assert cmds.decode_volume("64") == 100
+def test_zone_16_is_hex_10():
+    _prefix, body = AmpCommands().set_output(16, 4)
+    assert body == "c4.amp.out 10 04"
+
+
+def test_amp_volume_command():
+    cmds = AmpCommands()
+    _prefix, body = cmds.set_volume(1, 12)
+    assert body == "c4.amp.chvol 01 a7"
+    assert cmds.decode_volume("a7") == 12
 
 
 def test_split_user_command_get_vs_set():
@@ -65,11 +67,11 @@ def test_split_user_command_get_vs_set():
 
 
 def test_amp_volume_limit_command():
-    cmds = DeviceCommands("c4.amp", "chvol", "offset")
+    cmds = AmpCommands()
     _prefix, body = cmds.set_volume_max(2, 40)
     assert body == "c4.amp.chvolmax 02 c3"
     _prefix, get_body = cmds.get_volume_limits()
     assert get_body == "c4.amp.vlim"
-    cmds = DeviceCommands("c4.amp", "chvol", "offset")
+    cmds = AmpCommands()
     _prefix, body = cmds.set_mute(2, False)
     assert body == "c4.amp.mute 02 00"

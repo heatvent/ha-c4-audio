@@ -27,6 +27,8 @@ class C4UdpActivitySensor(CoordinatorEntity[C4AudioCoordinator], SensorEntity):
     _attr_icon = "mdi:console-line"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_force_update = True
+    # Twenty lines on every frame would fill the recorder.
+    _unrecorded_attributes = frozenset({"activity"})
 
     def __init__(self, coordinator: C4AudioCoordinator) -> None:
         super().__init__(coordinator)

@@ -16,7 +16,7 @@ except ImportError:
 
 # Suffixes this integration has ever assigned after "{host}_".
 _LEGACY_SUFFIX = re.compile(
-    r"_(?:zone_\d+(?:_(?:bass|treble|source))?|output_\d+_source|all_on|all_off|all_zones|udp_activity)$"
+    r"_(?:zone_\d+(?:_(?:bass|treble|source))?|all_on|all_off|all_zones|udp_activity)$"
 )
 
 
@@ -47,3 +47,18 @@ def migrated_unique_id(
     if match is None:
         return None
     return f"{stable_id}{match.group(0)}"
+
+
+_ZONE_SUFFIX = re.compile(r"^zone_(\d+)(_balance)?(?:_|$)")
+_INPUT_SUFFIX = re.compile(r"^input_(\d+)_gain$")
+
+
+def unused_suffix(
+    suffix: str, *, zones: list[int], inputs: list[int], balance: bool
+) -> bool:
+    """True when no entity with this unique-id suffix is created any more."""
+    match = _ZONE_SUFFIX.match(suffix)
+    if match:
+        return int(match.group(1)) not in zones or (bool(match.group(2)) and not balance)
+    match = _INPUT_SUFFIX.match(suffix)
+    return bool(match) and int(match.group(1)) not in inputs

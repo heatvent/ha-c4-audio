@@ -10,6 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
+from .const import GET_RETRIES, REJECTED
 from .protocol import ParsedPacket, build_frame, next_sequence, parse_packet
 
 _LOGGER = logging.getLogger(__name__)
@@ -166,34 +167,56 @@ class C4UdpClient:
             except Exception:  # noqa: BLE001 — keep the socket loop alive
                 _LOGGER.exception("Error in UDP listener")
 
-    async def async_send(self, prefix: str, body: str) -> ParsedPacket | None:
-        """Send one frame and wait for its reply before another command may start."""
-        quiet = prefix.startswith("0g")
-        async with self._lock:
-            if self._transport is None:
-                await self._open_socket()
-            seq = self._seq
-            self._seq = next_sequence(self._seq)
-            loop = asyncio.get_running_loop()
-            future: asyncio.Future[ParsedPacket] = loop.create_future()
-            self._pending[seq] = future
-            self._pending_noisy[seq] = not quiet
-            frame = build_frame(prefix, seq, body)
-            text = _ascii_frame(frame)
-            self._note(f"{_stamp()}  →  {self.host}  {text}", noisy=not quiet)
-            assert self._transport is not None
-            self._transport.sendto(frame)
+    async def async_send(self, prefix: str, body: str, *, retries: int = 0) -> ParsedPacket | None:
+        """Send one frame and wait for its reply. Repeat it up to `retries` times if none comes.
+
+        A repeated SET keeps the lock, so it can never land after a newer command.
+        A repeated GET lets waiting commands go first.
+        """
+        if prefix.startswith("0g"):
+            for _attempt in range(retries + 1):
+                async with self._lock:
+                    packet = await self._async_send_locked(prefix, body)
+                if packet is not None or self._closing:
+                    return packet
+        else:
+            async with self._lock:
+                for _attempt in range(retries + 1):
+                    packet = await self._async_send_locked(prefix, body)
+                    if packet is not None or self._closing:
+                        return packet
+        _LOGGER.debug("No reply from %s for %s %s", self.host, prefix, body)
+        return None
+
+    async def _async_send_locked(self, prefix: str, body: str) -> ParsedPacket | None:
+        if self._closing:
+            return None
+        if self._transport is None:
             try:
-                return await asyncio.wait_for(future, timeout=self.timeout)
-            except TimeoutError:
-                self._pending.pop(seq, None)
-                self._pending_noisy.pop(seq, None)
-                self._note(f"{_stamp()}  ×  {self.host}  timeout {prefix} {body}", noisy=True)
-                _LOGGER.warning("UDP timeout waiting for %s %s", prefix, body)
+                await self._open_socket()
+            except OSError as err:
+                _LOGGER.debug("Could not open a UDP socket to %s: %s", self.host, err)
                 return None
-            except ConnectionError:
-                _LOGGER.warning("UDP socket closed waiting for %s %s", prefix, body)
-                return None
+        quiet = prefix.startswith("0g")
+        seq = self._seq
+        self._seq = next_sequence(self._seq)
+        future: asyncio.Future[ParsedPacket] = asyncio.get_running_loop().create_future()
+        self._pending[seq] = future
+        self._pending_noisy[seq] = not quiet
+        frame = build_frame(prefix, seq, body)
+        self._note(f"{_stamp()}  →  {self.host}  {_ascii_frame(frame)}", noisy=not quiet)
+        assert self._transport is not None
+        self._transport.sendto(frame)
+        try:
+            return await asyncio.wait_for(future, timeout=self.timeout)
+        except TimeoutError:
+            self._pending.pop(seq, None)
+            self._pending_noisy.pop(seq, None)
+            self._note(f"{_stamp()}  ×  {self.host}  timeout {prefix} {body}", noisy=True)
+            return None
+        except ConnectionError:
+            _LOGGER.debug("UDP socket closed waiting for %s %s", prefix, body)
+            return None
 
 
 async def async_probe_firmware(host: str, port: int, timeout: float) -> str | None:
@@ -207,26 +230,27 @@ class ProbeIdentity:
     firmware: str | None
     info: str | None
     model_id: str | None
+    # It answered c4.amp.ain, but not the way an amp does (for example the audio switch).
+    not_amp: bool = False
 
 
 async def async_probe_identity(host: str, port: int, timeout: float) -> ProbeIdentity | None:
-    """GET firmware/info and classify amp vs switch from ain replies."""
-    from .const import MODEL_AMP108, MODEL_AMP16, MODEL_AMP16ZONE, MODEL_MATRIX16
+    """GET firmware/info and pick the amp model from the ain reply."""
+    from .discovery import model_from_probe
     from .protocol import parse_hex_list
 
     client = C4UdpClient(host, port, timeout)
     try:
         await client.async_start()
-        fw = await client.async_send("0g", "c4.sy.fwv")
+        fw = await client.async_send("0g", "c4.sy.fwv", retries=GET_RETRIES)
         if fw is None:
             return None
         firmware = fw.args[0].strip('"') if fw.args else ""
-        info_pkt = await client.async_send("0g", "c4.sy.info")
+        info_pkt = await client.async_send("0g", "c4.sy.info", retries=GET_RETRIES)
         info = None
         if info_pkt and info_pkt.args:
             info = info_pkt.args[0].strip('"')
-        asw = await client.async_send("0g", "c4.asw.ain")
-        amp = await client.async_send("0g", "c4.amp.ain")
+        amp = await client.async_send("0g", "c4.amp.ain", retries=GET_RETRIES)
     except Exception:  # noqa: BLE001
         _LOGGER.exception("Identity probe failed for %s:%s", host, port)
         return None
@@ -234,16 +258,12 @@ async def async_probe_identity(host: str, port: int, timeout: float) -> ProbeIde
         await client.async_stop()
 
     model_id = None
-    if asw is not None and asw.status_code not in {"n01", "e00"} and asw.args:
-        values = [item for item in parse_hex_list(asw.args) if item is not None]
-        if len(values) >= 8:
-            model_id = MODEL_MATRIX16
-    if model_id is None and amp is not None and amp.status_code not in {"n01", "e00"}:
+    if amp is not None and amp.status_code not in REJECTED:
         values = [item for item in parse_hex_list(amp.args) if item is not None]
-        if len(values) >= 16:
-            model_id = MODEL_AMP16ZONE
-        elif len(values) >= 8:
-            model_id = MODEL_AMP16
-        elif len(values) >= 4:
-            model_id = MODEL_AMP108
-    return ProbeIdentity(firmware=firmware, info=info, model_id=model_id)
+        model_id = model_from_probe(info, len(values))
+    return ProbeIdentity(
+        firmware=firmware,
+        info=info,
+        model_id=model_id,
+        not_amp=amp is not None and model_id is None,
+    )

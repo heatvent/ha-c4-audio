@@ -13,7 +13,7 @@ This file is the command/response set used by this integration, with what is con
 | Terminator | `\r\n` |
 | Discovery | SDDP (not required for control) |
 
-Same port and framing appear on C4-AMP108, C4-8AMP1, C4-16AMP3-class matrix amps, and in community reports for the **C4-16ZAMSV3-B**. A **Triad** audio matrix is a different product (TCP + binary) and is **not** this protocol.
+Same port and framing appear on C4-AMP108, C4-8AMP1, and C4-16AMP3-class matrix amps. The Control4 audio switch (C4-16ZAMSV3-B / AVM-16S1-B) uses a different command set, `c4.asw`, and is not supported. It answers `c4.amp` with an empty `0r`. A **Triad** audio matrix is a different product (TCP + binary) and is **not** this protocol.
 
 ## Packet framing
 
@@ -104,7 +104,7 @@ Do **not** send `c4.amp.chvolmax` from a volume slider. Public HA code documents
 | GET | `c4.amp.abss` / `atrb` / `abal` / `igain {n}` |
 | Status | `c4.amp.tone {zone} {bass} {bassfreq} {treble} {trebfreq}` |
 
-Signed gains are 8-bit two’s complement (`00` = 0 dB, `ff` = −1, `03` = +3). Community HA code uses SET `c4.amp.bal` for balance; AMP108 GET is `c4.amp.abal`. Treat balance SET as **not fully captured** on this chassis.
+Signed gains are 8-bit two’s complement (`00` = 0 dB, `ff` = −1, `03` = +3). SET `c4.amp.bal` changes balance (confirmed on the 16AMP3, below; not captured on AMP108); GET is `c4.amp.abal`.
 
 ### Power save and system
 
@@ -121,25 +121,27 @@ Some HA scripts send **`c4.amp.psave 00 00`** (two bytes) to wake. Your AMP108 a
 
 GET `c4.sy.afwv` returned `n01` (not supported) on that amp.
 
+## C4-8AMP1-B
+
+From Control4's own driver descriptor (`amp3_4Ch_control4.c4i`): 4 zones, 4 inputs, UDP 8750, same control driver as the 16AMP3. Inputs 1 and 3 are analog **or** digital coax, not both. Not tested on a live chassis.
+
+Both descriptors limit volume steps to one per 250 ms and list balance and input gain.
+
 ## C4-16AMP3-B
 
+Checked on firmware `03.26.52`:
+
+| Command | Reply |
+|---|---|
+| GET `c4.amp.abal` | 8 signed bytes, `00` = center |
+| SET `c4.amp.bal {zone} {signed}` | `000`; `bal 08 01` reads back as `01` in `abal`, `00` restores it |
+| GET `c4.amp.igain {input}` | input, then a signed byte, `00` = 0 dB |
+| SET `c4.amp.igain {input} {signed}` | `000`; `igain 01 ff` reads back as `ff`, `00` restores it |
+| GET `c4.amp.digi {input}` | `n01` (no digital inputs) — not sent on this model |
+| GET `c4.sy.sub` | `"ethernet {Director ip:port}" "none"` — Director holds one slot. A second one may exist; this integration does not subscribe |
+
+
 Same `c4.amp.*` names. GET lists return **eight** hex slots. `GET c4.amp.psave` is `n01` on firmware `03.26.52` — this integration does not send `psave` on that model.
-
-## AVM-16S1-B / C4-16ZAMSV3-B (16×16 switch)
-
-Live-tested on UDP **8750**. Namespace is **`c4.asw`**, not `c4.amp`.
-
-| Direction | Command | Notes |
-|---|---|---|
-| GET | `c4.asw.ain` | 16 hex bytes, one per output |
-| SET | `c4.asw.out {output} {input}` | Output **16** is hex `10`. `00` disconnects |
-| SET | `c4.asw.mute {output} 00\|01` | |
-| SET | `c4.asw.vol {output} {hex}` | **0–100 as hex**; `64` = 100 = unity. This is line trim, not a speaker amp |
-| SET | `c4.asw.chvol …` | `n01` — not supported |
-
-Do not use `c4.amp` / `c4.switch` / `c4.sw` on this chassis (empty `0r`).
-
-A **Triad** 16×16 uses TCP binary and is not this integration.
 
 ## Independent public sources
 
@@ -150,7 +152,7 @@ A **Triad** 16×16 uses TCP binary and is not this integration.
 
 ### kmakar89/Home-Assistant---Control4 (reviewed)
 
-Hard-coded HA services for a **4-zone matrix amp** plus a **separate Control4 tuner** chassis. Not a HACS media-player integration, and it does **not** talk to an audio switch (`c4.asw` never appears).
+Hard-coded HA services for a **4-zone matrix amp** plus a **separate Control4 tuner** chassis. Not a HACS media-player integration.
 
 What it actually sends (UDP 8750):
 
@@ -162,7 +164,7 @@ What it actually sends (UDP 8750):
 | Tuner | `c4.mt.tafreq2 00 {hex}` | Tuner 1 FM frequency |
 | Tuner | `c4.mt.tbfreq2 00 {hex}` | Tuner 2 FM frequency |
 
-FM encoding: station in MHz × 100, then hex (example `94.9` → `9490` → `2512`). That is a different product class from the amp/switch; add it only if a C4 tuner is on the LAN.
+FM encoding: station in MHz × 100, then hex (example `94.9` → `9490` → `2512`). That is a different product class from the amp; add it only if a C4 tuner is on the LAN.
 
 Volume in that repo is **percent + 160**, then hex. Director captures and this integration use **percent + 155**. `+160` plays a few percent louder than Composer. Default power-on in their scripts is `chvol … a9`.
 
@@ -172,7 +174,7 @@ Great Room is two amp zones (`03` and `04`) driven together — useful if a “r
 
 ### OtisPresley/control4-mediaplayer (reviewed)
 
-HACS **amp-only** media player (fork of Hansen8601). One HA config entry **per zone**, not per chassis. Volume formula matches this integration: **percent + 155**. Mute requires `00`/`01`. No `c4.asw` / matrix switch. No GET polling — README claims the amp does not report state; that is **false** on 16AMP3 / AVM-16S1 (`ain`, `avol`, `amut`, unsolicited `0t`).
+HACS **amp-only** media player (fork of Hansen8601). One HA config entry **per zone**, not per chassis. Volume formula matches this integration: **percent + 155**. Mute requires `00`/`01`. No GET polling — README claims the amp does not report state; that is **false** on 16AMP3 (`ain`, `avol`, `amut`, unsolicited `0t`).
 
 Commands it sends:
 
@@ -182,7 +184,7 @@ Commands it sends:
 | `c4.amp.chvol {zone} {hex}` | Volume | Same scale (`9b` = 0%) |
 | `c4.amp.mute {zone} 00\|01` | Mute | If reply contains `n01` or times out, they `chvol` to `9b` / restore |
 | `c4.amp.bassgain` / `trebgain` | EQ sliders −12…+12 | Same two’s-complement hex |
-| `c4.amp.bal {zone} {signed}` | Balance −10…+10 | SET name `bal`; AMP108 GET is `abal`. Not live-tested here |
+| `c4.amp.bal {zone} {signed}` | Balance −10…+10 | SET name `bal` confirmed on 16AMP3; GET is `abal` |
 | `c4.amp.psave 00 00` / `01 00` | Wake / power-save | **Two-byte** form. AMP108 accepted one-byte `psave 00`. 16AMP3 GET `psave` is `n01` |
 | `c4.amp.chvolmax` | Hardware volume cap | **Firmware bug**: SET jumps live volume to the cap. They now keep the cap in software and only ever send `chvol`. Do not use from a slider |
 | `c4.amp.chmode {zone} 00\|01\|02` | Output topology | `00` stereo, `01` mono summed, `02` bridged mono. In their manager, not exposed in the UI. Untested on 16AMP3 |

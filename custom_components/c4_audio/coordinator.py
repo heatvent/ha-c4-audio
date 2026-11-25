@@ -295,6 +295,14 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
             hold_s=_VOLUME_HOLD_S,
         )
 
+    def _read_volume(self, zone: int, value: int) -> int:
+        decoded = self.cmds.decode_volume(f"{value:02x}")
+        last = self._last_commanded_volume.get(zone)
+        if decoded == 1 and last is not None and last[1] == 0:
+            # The C4-8AMP1-B stores 0% as 1%.
+            return 0
+        return decoded
+
     def _remember_volume(self, zone: int, percent: int) -> None:
         self._last_commanded_volume[zone] = (time.monotonic(), percent)
 
@@ -628,7 +636,7 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
 
     def _apply_volumes(self, values: list[int | None]) -> None:
         for zone, value in self._zone_values(values):
-            decoded = self.cmds.decode_volume(f"{value:02x}")
+            decoded = self._read_volume(zone, value)
             if not self._volume_is_stale(zone, decoded):
                 self._observe(zone, "volume", decoded)
 
@@ -667,7 +675,7 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
         elif cmd == f"{self.cmds.ns}.mute":
             self._observe(zone, "muted", from_hex_byte(packet.args[1]) == 1)
         elif cmd in {f"{self.cmds.ns}.chvol", f"{self.cmds.ns}.vol"}:
-            decoded = self.cmds.decode_volume(packet.args[1])
+            decoded = self._read_volume(zone, from_hex_byte(packet.args[1]))
             if self._volume_is_stale(zone, decoded):
                 return
             self._observe(zone, "volume", decoded)

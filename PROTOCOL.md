@@ -37,7 +37,7 @@ The same `0s` / `0g` / `0r` ASCII scheme shows up on other Control4 hardware (fo
 | Token | Meaning (from captures + community) |
 |---|---|
 | `000` | OK; GET often echoes the command and values |
-| `v01` | Accepted / “value ok” (common on SET volume/route) |
+| `v01` | Seen on SET in the old capture; on a C4-8AMP1-B it means the value is out of range and nothing changed |
 | `n01` | Not supported on this firmware/model |
 | `e00` | Error (bad args — e.g. mute without `00`/`01`) |
 
@@ -123,7 +123,20 @@ GET `c4.sy.afwv` returned `n01` (not supported) on that amp.
 
 ## C4-8AMP1-B
 
-From Control4's own driver descriptor (`amp3_4Ch_control4.c4i`): 4 zones, 4 inputs, UDP 8750, same control driver as the 16AMP3. Inputs 1 and 3 are analog **or** digital coax, not both. Not tested on a live chassis.
+From Control4's own driver descriptor (`amp3_4Ch_control4.c4i`): 4 zones, 4 inputs, UDP 8750, same control driver as the 16AMP3. Inputs 1 and 3 are analog **or** digital coax, not both.
+
+Live-tested on firmware `03.24.45`, `c4.sy.info` = `v1_8chanamp:c4-8AMP1-B:<mac>`. The earlier "AMP108" capture has the same firmware, zone count, and Director address, so it was very likely this model.
+
+| Command | Result |
+|---|---|
+| SET `c4.amp.psave 00` | `000`; GET `psave` reads `00` |
+| SET `c4.amp.out {zone} 01`–`04` | `000`, reads back in `ain` |
+| SET `c4.amp.out {zone} 05`–`09`, or zone 5 | `v01`, nothing changes |
+| SET `c4.amp.mute`, `bassgain`, `trebgain` (±12) | `000`, reads back |
+| SET `c4.amp.chvol` | `000`, reads back, except 0% (`9b`) which reads back as 1% (`9c`) |
+| SET `c4.amp.bal` (±10) | `000`, reads back in `abal` |
+| SET `c4.amp.igain` | Negative values read back. Positive values answer `000` but read back as `00` |
+| GET `c4.amp.digi {input}` | `01` for inputs 1 and 3 (the digital jacks), `00` for the rest |
 
 Both descriptors limit volume steps to one per 250 ms and list balance and input gain.
 

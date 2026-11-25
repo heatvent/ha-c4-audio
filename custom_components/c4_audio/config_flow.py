@@ -271,7 +271,7 @@ class C4AudioConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors={"base": "not_an_amp"},
             )
         unique = identity_from_info(identity.info, device.ident)
-        await self.async_set_unique_id(unique)
+        await self.async_set_unique_id(unique, raise_on_progress=False)
         self._abort_if_unique_id_configured(updates={CONF_HOST: device.host})
         model = identity.model_id or device.suggested_model or MODEL_AMP16
         self._data = {
@@ -391,7 +391,7 @@ class C4AudioConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 step_id="user", data_schema=_model_schema(user_input), errors=errors
             )
         unique = identity_from_info(identity.info, host)
-        await self.async_set_unique_id(unique)
+        await self.async_set_unique_id(unique, raise_on_progress=False)
         self._abort_if_unique_id_configured(updates={CONF_HOST: host})
         model = user_input.get(CONF_MODEL) or identity.model_id or MODEL_AMP16
         if identity.model_id:

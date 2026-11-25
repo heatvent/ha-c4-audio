@@ -42,7 +42,7 @@ MAX_FAILED_ZONES = 2
 VOLUME_INTERVAL_S = 0.25
 
 BALANCE_LIMIT = 10
-INPUT_GAIN_LIMIT = 6
+INPUT_GAIN_LIMIT = 6  # lowest level is minus this; the highest is per model
 
 # Serial-over-UDP framing used by C4 Ethernet audio hardware.
 CMD_PREFIX_SET = "0s"
@@ -67,6 +67,7 @@ MODELS = {
         "inputs": 8,
         "wake_power_save": False,
         "digital_inputs": False,
+        "input_gain_max": INPUT_GAIN_LIMIT,
     },
     MODEL_8AMP1: {
         "name": "C4-8AMP1-B (4-zone amp)",
@@ -75,6 +76,8 @@ MODELS = {
         "inputs": 4,
         "wake_power_save": True,
         "digital_inputs": True,
+        # Firmware 03.24.45 keeps a positive level at 0.
+        "input_gain_max": 0,
     },
     MODEL_AMP108: {
         "name": "C4-AMP108-1B (4-zone amp)",
@@ -83,5 +86,6 @@ MODELS = {
         "inputs": 8,
         "wake_power_save": True,
         "digital_inputs": True,
+        "input_gain_max": 0,
     },
 }

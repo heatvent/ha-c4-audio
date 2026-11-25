@@ -7,9 +7,9 @@ import socket
 from dataclasses import dataclass
 
 try:
-    from .const import MODEL_AMP108, MODEL_AMP16, MODEL_MATRIX16
+    from .const import MODEL_8AMP1, MODEL_AMP108, MODEL_AMP16
 except ImportError:  # running tests without the HA package
-    from const import MODEL_AMP108, MODEL_AMP16, MODEL_MATRIX16
+    from const import MODEL_8AMP1, MODEL_AMP108, MODEL_AMP16
 
 SDDP_MULTICAST = "239.255.255.250"
 SDDP_PORT = 1902
@@ -19,12 +19,10 @@ AMP_HINTS = (
     "16chanamp",
     "16amp3",
     "amp108",
-    "8amp",
     "c4amp",
     "matrixamp",
     "v3_16chanamp",
 )
-SWITCH_HINTS = ("avswitch", "avm-16", "16zams", "16s1")
 
 
 @dataclass(frozen=True)
@@ -73,14 +71,26 @@ def parse_sddp_packet(data: bytes | str, source_ip: str | None = None) -> SddpDe
 
 def suggest_model(sddp_type: str, model_name: str, ident: str) -> str | None:
     blob = f"{sddp_type} {model_name} {ident}".lower()
-    if any(hint in blob for hint in SWITCH_HINTS):
-        return MODEL_MATRIX16
+    if "8amp1" in blob or "8chanamp" in blob:
+        return MODEL_8AMP1
     if "amp108" in blob or "4-zone" in blob:
         return MODEL_AMP108
     if "16amp" in blob or "16chanamp" in blob or "8-zone" in blob:
         return MODEL_AMP16
     if any(hint in blob for hint in AMP_HINTS):
         return MODEL_AMP16
+    return None
+
+
+def model_from_probe(info: str | None, zone_count: int) -> str | None:
+    """Pick the model from the number of c4.amp.ain values and the c4.sy.info string."""
+    if zone_count >= 8:
+        return MODEL_AMP16
+    if zone_count >= 4:
+        text = (info or "").lower()
+        if "8amp1" in text or "8chanamp" in text:
+            return MODEL_8AMP1
+        return MODEL_AMP108
     return None
 
 

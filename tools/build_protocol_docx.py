@@ -100,20 +100,21 @@ def build() -> None:
     meta = doc.add_paragraph()
     meta.add_run("Unofficial reverse-engineered protocol\n").italic = True
     meta.add_run(
-        "For C4-AMP108-1B, C4-16AMP3-B, and AVM-16S1-B / C4-16ZAMSV3-B class audio switch. "
+        "For C4-AMP108-1B and C4-16AMP3-B class amplifiers. "
         "Control4 has not published this API. Commands were recovered from Director packet logs "
         "and live probes on UDP port 8750."
     )
 
     doc.add_heading("1. Purpose and scope", 1)
     doc.add_paragraph(
-        "This manual describes how to talk directly to Control4 matrix amplifiers and the "
-        "16×16 stereo audio matrix switch over the LAN, without a Control4 driver running in "
+        "This manual describes how to talk directly to Control4 matrix amplifiers "
+        "over the LAN, without a Control4 driver running in "
         "the client. Director (EA-5 and similar) uses the same language. Home Assistant, a "
         "UDP probe, or a small script can send the same packets."
     )
     doc.add_paragraph(
-        "A Triad audio matrix (TCP, binary) is a different product and is not covered here."
+        "The Control4 audio switch (C4-16ZAMSV3-B / AVM-16S1-B, c4.asw) and the Triad audio matrix "
+        "(TCP, binary) are different products and are not covered here."
     )
 
     doc.add_heading("1.1 Hardware used to confirm this document", 2)
@@ -125,19 +126,13 @@ def build() -> None:
                 "Director",
                 "c4:control4_ea5",
                 "192.168.68.117",
-                "Subscribes to ethernet events on the switch",
+                "Subscribes to ethernet events",
             ],
             [
                 "8-zone amplifier",
                 "c4:v3_16chanamp:c4-16amp3-b",
                 "192.168.68.93",
                 '03.26.52  /  c4.sy.info "v3_16chanamp:c4-16amp3-b:…"',
-            ],
-            [
-                "16×16 audio switch",
-                "c4:v3_avswitch:avm-16s1-b",
-                "192.168.68.80",
-                '03.26.53  /  c4.sy.info "c4:v3_avswitch:avm-16s1-b:…"',
             ],
             [
                 "4-zone amplifier (earlier capture)",
@@ -199,10 +194,10 @@ def build() -> None:
         ["Token", "Meaning"],
         [
             ["000", "Success. GET replies usually continue with the command name and data."],
-            ["v01", "Accepted / value OK. Common on some SET replies. Also seen when a SET is ignored (for example volume above 100 on the switch)."],
+            ["v01", "Accepted / value OK. Common on some SET replies."],
             ["n01", "Not supported on this model or firmware."],
-            ["e00", "Error — typically bad arguments (mute without 00/01, GET c4.asw.out with no zone)."],
-            ["(empty)", "The device heard the packet and returned 0r{seq} with no token. Typical for a wrong command family (for example c4.amp.* sent to the switch)."],
+            ["e00", "Error — typically bad arguments (mute without 00/01)."],
+            ["(empty)", "The device heard the packet and returned 0r{seq} with no token. Typical for a wrong command family."],
         ],
         mono_cols={0},
     )
@@ -210,13 +205,12 @@ def build() -> None:
     doc.add_heading("3.2 Numbers in command bodies", 2)
     doc.add_paragraph(
         "Zone, input, mute, and most levels are two-digit hexadecimal bytes, 1-based for jacks "
-        "(01 = jack 1). Output 16 is hex 10, not decimal 16. Decimal 16 as a zone argument is a "
-        "different slot and can return v01 without meaning “output 16”."
+        "(01 = jack 1). Zone 16 is hex 10, not decimal 16."
     )
     add_code(doc, "Zone 1  →  01\nZone 8  →  08\nZone 16 →  10\nDisconnect / off →  00")
 
-    doc.add_heading("4. System commands (both products)", 1)
-    doc.add_paragraph("These use the c4.sy.* namespace and work on both the amplifier and the audio switch.")
+    doc.add_heading("4. System commands", 1)
+    doc.add_paragraph("These use the c4.sy.* namespace.")
     add_table(
         doc,
         ["Get/Set", "Body", "Typical reply"],
@@ -225,7 +219,6 @@ def build() -> None:
             ["GET", "c4.sy.info", '000 c4.sy.info "v3_16chanamp:c4-16amp3-b:…"'],
             ["GET", "c4.sy.sub", '000 c4.sy.sub "ethernet 192.168.68.117:-21887"'],
             ["SET", 'c4.sy.sub "ethernet"', "000 (Director subscribe)"],
-            ["GET", "c4.sy.mac / c4.sy.ver / c4.sy.ip", "n01 on the AVM-16S1-B"],
             ["GET", "c4.sy.afwv", "n01 on AMP108"],
         ],
         mono_cols={0, 1, 2},
@@ -314,72 +307,7 @@ def build() -> None:
     doc.add_paragraph("Turn a zone off:")
     add_code(doc, "0s … c4.amp.mute {zone} 01\n0s … c4.amp.out {zone} 00")
 
-    doc.add_heading("6. 16×16 audio switch — namespace c4.asw", 1)
-    doc.add_paragraph(
-        "Composer name: Control4 Audio Switch, type c4:v3_avswitch:avm-16s1-b "
-        "(same family as C4-16ZAMSV3-B). Sixteen stereo RCA inputs and sixteen line-level RCA outputs. "
-        "It does not drive speakers. Outputs feed the matrix amp and A/V receivers."
-    )
-    note(
-        doc,
-        "c4.amp.*, c4.switch.*, and c4.sw.* are the wrong family. The switch answers those with an empty 0r. The working prefix is c4.asw (audio switch).",
-        "Important",
-    )
-
-    doc.add_heading("6.1 Routing, mute, and output gain", 2)
-    add_table(
-        doc,
-        ["Get/Set", "Body", "Live result"],
-        [
-            ["GET", "c4.asw.ain", "16 hex bytes, input currently feeding each output. 00 = disconnected."],
-            ["SET", "c4.asw.out {output} {input}", "000 on success. Example: out 10 01 routes input 1 to output 16; ain’s 16th byte becomes 01."],
-            ["GET", "c4.asw.out", "e00 — GET is not valid without (or even with) this shape; use ain."],
-            ["SET", "c4.asw.mute {output} 00|01", "000. GET amut updates that slot."],
-            ["GET", "c4.asw.amut", "16 mute flags."],
-            ["GET", "c4.asw.avol", "16 gain bytes. Factory/unity is 64 hex = 100 decimal."],
-            ["SET", "c4.asw.vol {output} {hex}", "Output gain. 00 = silence/full cut, 64 = 100 / unity. chvol is n01 on this device."],
-            ["GET", "c4.asw.abss / atrb / abal", "Bass, treble, balance (defaults 07, 07, 0c on this unit)."],
-            ["GET", "c4.asw.psave", "n01"],
-        ],
-        mono_cols={0, 1},
-    )
-
-    doc.add_heading("6.2 Switch “volume” is line-level trim", 2)
-    doc.add_paragraph(
-        "Composer shows a Volume slider at 100, plus Bass, Treble, Balance, Source Leveling, "
-        "Reset Settings, and Set Unity Gain. The switch is not a power amplifier. Volume is "
-        "electronic output gain used to match levels between sources and destinations."
-    )
-    doc.add_paragraph("Confirmed behavior on unused output 16:")
-    add_table(
-        doc,
-        ["Action", "Reply / ain or avol"],
-        [
-            ["SET c4.asw.vol 10 32 (50 decimal)", "000; avol 16th byte → 32"],
-            ["SET c4.asw.vol 10 00", "000; avol 16th byte → 00"],
-            ["SET c4.asw.vol 10 64 (100)", "000; avol 16th byte → 64 (unity)"],
-            ["SET c4.asw.vol 10 78 (120 decimal)", "v01 but avol stayed 64 — values above 100 do not stick"],
-        ],
-        mono_cols={0, 1},
-    )
-    doc.add_paragraph(
-        "So 100 (hex 64) is normal passthrough / unity. 0 is full attenuation. That is the "
-        "right mental model for leveling different inputs and outputs. Speaker loudness still "
-        "belongs on the 16AMP3 or the Sony receivers."
-    )
-
-    doc.add_heading("6.3 Worked routing example", 2)
-    add_code(
-        doc,
-        "SET  0s6109 c4.asw.out 10 01\\r\\n\n"
-        "RECV 0r6109 000\\r\\n\n"
-        "GET  0g610a c4.asw.ain\\r\\n\n"
-        "RECV 0r610a 000 c4.asw.ain 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01\\r\\n\n"
-        "SET  0s610b c4.asw.out 10 00\\r\\n\n"
-        "RECV 0r610b 000\\r\\n",
-    )
-
-    doc.add_heading("7. Broken, rejected, and missing commands", 1)
+    doc.add_heading("6. Broken, rejected, and missing commands", 1)
     doc.add_paragraph(
         "This section is the working list of commands that fail, are unsafe, or exist in Composer "
         "but have no recovered UDP string yet. Empty 0r means the chassis parsed the packet but "
@@ -387,7 +315,7 @@ def build() -> None:
         "on that firmware. e00 means the name is known but the arguments are wrong."
     )
 
-    doc.add_heading("7.1 Do not use (broken or unsafe)", 2)
+    doc.add_heading("6.1 Do not use (broken or unsafe)", 2)
     add_table(
         doc,
         ["Command", "Product", "What happens", "Use instead"],
@@ -410,51 +338,22 @@ def build() -> None:
                 "AMP108 test: reply e00.",
                 "c4.amp.mute {zone} 00|01",
             ],
-            [
-                "Zone 16 as decimal 16",
-                "16x16 switch",
-                "c4.asw.out 16 00 returned v01 but is not output 16. Output 16 is hex 10.",
-                "Always two-digit hex: 10 = output 16.",
-            ],
         ],
         mono_cols={0, 3},
     )
 
-    doc.add_heading("7.2 Wrong namespace (switch vs amp)", 2)
-    doc.add_paragraph(
-        "Sending amplifier commands to the AVM-16S1-B produces an empty 0r (sequence only). "
-        "The switch is alive; the name is simply not c4.amp."
-    )
-    add_table(
-        doc,
-        ["Tried on switch 192.168.68.80", "Reply"],
-        [
-            ["GET/SET c4.amp.ain, avol, out, mute, chvol, psave", "Empty 0r"],
-            ["c4.switch.out / c4.switch.ain", "Empty 0r"],
-            ["c4.sw.out / c4.sw.ain", "Empty 0r"],
-            ["c4.avs.*, c4.avswitch.*, c4.avm.*, c4.ams.*, c4.matrix.*, c4.av.*", "Empty 0r"],
-            ["c4.asw.chvol {zone} {hex}", "n01 — volume SET is c4.asw.vol, not chvol"],
-            ["GET c4.asw.out", "e00 — list routes with GET c4.asw.ain"],
-            ["GET c4.asw.psave", "n01"],
-            ["c4.asw.ogain / gain / ovol / level", "n01"],
-            ["SET c4.asw.vol 10 78 (above 100)", "v01 but avol unchanged — unity cap is 64 hex / 100"],
-        ],
-        mono_cols={0, 1},
-    )
-
-    doc.add_heading("7.3 Amplifier: rejected or model-specific", 2)
+    doc.add_heading("6.2 Amplifier: rejected or model-specific", 2)
     add_table(
         doc,
         ["Command", "Where", "Reply"],
         [
             ["GET c4.amp.psave", "C4-16AMP3-B 03.26.52", "n01 (worked as GET/SET on AMP108 03.24.45)"],
             ["GET c4.sy.afwv", "AMP108", "n01"],
-            ["GET c4.sy.mac / ver / ip", "AVM-16S1-B", "n01"],
         ],
         mono_cols={0, 1, 2},
     )
 
-    doc.add_heading("7.4 Missing — Composer control with no recovered UDP yet", 2)
+    doc.add_heading("6.3 Missing — Composer control with no recovered UDP yet", 2)
     doc.add_paragraph("Amplifier Advanced Properties (Composer) vs known packets:")
     add_table(
         doc,
@@ -463,28 +362,13 @@ def build() -> None:
             ["Inputs Locked", "No UDP string captured."],
             ["Volume curve Linear (dB)", "No UDP string captured."],
             ["Reset to Defaults (one button)", "Unknown as a single command; Director may replay many SET lines."],
-            ["Maximum Volume SET that is safe", "GET vlim works. Hardware SET chvolmax is unsafe (see 7.1). Unsolicited chlim exists after volume ramps."],
+            ["Maximum Volume SET that is safe", "GET vlim works. Hardware SET chvolmax is unsafe (see 6.1). Unsolicited chlim exists after volume ramps."],
             ["Parametric EQ 5 bands (Hz, gain, Q)", "SET c4.amp.eq exists (six-digit groups) but frequency/gain/Q packing is not fully decoded. Q=10 used 00060e in band 1."],
             ["EQ Reset to Defaults / Basic", "Not isolated; likely a batch of eq + bass/treble SET."],
             ["Digital input select (beyond GET digi)", "GET c4.amp.digi is used before route; SET form not confirmed on 16AMP3."],
         ],
     )
-    doc.add_paragraph("Audio switch Advanced Properties vs known packets:")
-    add_table(
-        doc,
-        ["Composer control", "Status"],
-        [
-            ["Output Volume 0-100", "Confirmed: GET avol, SET vol. 100 = unity."],
-            ["Mute", "Confirmed: SET mute, GET amut."],
-            ["Bass / Treble / Balance sliders", "GET abss, atrb, abal work. SET names (bassgain / trebgain / bal) not live-tested on the switch."],
-            ["Source Leveling (input, dB, Set)", "Likely c4.asw.igain by analogy with c4.amp.igain; not confirmed on AVM-16S1-B."],
-            ["Set Unity Gain", "Unknown as one command; SET vol {n} 64 on each output would match 100."],
-            ["Reset Settings", "Unknown as one command."],
-            ["DHCP / static IP Apply Settings", "Not in the c4.asw audio namespace; network is Composer/SDDP, not these UDP strings."],
-        ],
-    )
-
-    doc.add_heading("7.5 Captured but not fully decoded", 2)
+    doc.add_heading("6.4 Captured but not fully decoded", 2)
     add_table(
         doc,
         ["Command", "What we know", "What is missing"],
@@ -492,26 +376,11 @@ def build() -> None:
             ["c4.amp.eq {zone} five groups", "Accepted 000. Defaults and Q change captured on AMP108.", "Which hex fields are Hz, gain, Q for bands 80/125/250/1k/4k."],
             ["c4.amp.bassfreq / trebfreq", "Director sent 08 and 18; tone status 00 08 00 18.", "Exact Hz mapping to Composer 125 Hz / 5 kHz."],
             ["c4.amp.igain", "ff annotated -1 dB on AMP108.", "Full dB table; 16AMP3 not live-tested."],
-            ["c4.asw.abss = 07, abal = 0c", "Idle defaults on all 16 outputs.", "How 07/0c map to Composer 0 dB and center C."],
-            ["c4.asw.outvol", "SET returned v01; avol not verified against it.", "Whether it is an alias of vol or a no-op."],
         ],
         mono_cols={0},
     )
 
-    doc.add_heading("8. Typical physical graph (example site)", 1)
-    add_table(
-        doc,
-        ["Switch jack", "Connected to"],
-        [
-            ["Input 1", "EA-5 audio out 1"],
-            ["Input 3", "Retro Hi-Fi"],
-            ["Input 4", "WiiM Pro"],
-            ["Output 1", "Amplifier audio input 1"],
-            ["Output 2", "Basement receiver SA-CD/CD"],
-            ["Output 3", "Living Room receiver SA-CD/CD"],
-            ["Outputs 4–16", "Unused (safe for SET tests)"],
-        ],
-    )
+    doc.add_heading("7. Typical physical graph (example site)", 1)
     add_table(
         doc,
         ["Amp zone", "Room (Composer Room Selection)"],
@@ -531,12 +400,12 @@ def build() -> None:
         "Composer bindings are logical. Live GET c4.amp.ain can still be all zeros if no zone is currently routed, even though rooms are mapped.",
     )
 
-    doc.add_heading("9. How to test without Composer", 1)
+    doc.add_heading("8. How to test without Composer", 1)
     doc.add_paragraph("Probe (GET-only identify, then optional SET):")
     add_code(
         doc,
         "python tools/c4_probe.py --host 192.168.68.93 --identify\n"
-        "python tools/c4_probe.py --host 192.168.68.80 --get \"c4.asw.ain\"",
+        "python tools/c4_probe.py --host 192.168.68.93 --get \"c4.amp.ain\"",
     )
     doc.add_paragraph(
         "Relay / intermediary: bind UDP 8750 on a PC, point Composer’s device IP at that PC, "
@@ -544,27 +413,26 @@ def build() -> None:
         "and tools/c4_relay.py."
     )
 
-    doc.add_heading("10. Quick command cheat sheet", 1)
+    doc.add_heading("9. Quick command cheat sheet", 1)
     add_table(
         doc,
-        ["Task", "Amplifier", "Audio switch"],
+        ["Task", "Command"],
         [
-            ["Identify", "c4.sy.fwv / c4.sy.info", "same"],
-            ["List routes", "GET c4.amp.ain", "GET c4.asw.ain"],
-            ["Route", "SET c4.amp.out zz ii", "SET c4.asw.out zz ii"],
-            ["Disconnect", "SET c4.amp.out zz 00", "SET c4.asw.out zz 00"],
-            ["Mute", "SET c4.amp.mute zz 01", "SET c4.asw.mute zz 01"],
-            ["Volume / gain", "SET c4.amp.chvol zz {pct+155}", "SET c4.asw.vol zz {0–100 as hex}"],
-            ["Wrong family looks like", "—", "Empty 0r if you send c4.amp.*"],
+            ["Identify", "c4.sy.fwv / c4.sy.info"],
+            ["List routes", "GET c4.amp.ain"],
+            ["Route", "SET c4.amp.out zz ii"],
+            ["Disconnect", "SET c4.amp.out zz 00"],
+            ["Mute", "SET c4.amp.mute zz 01"],
+            ["Volume", "SET c4.amp.chvol zz {pct+155}"],
         ],
-        mono_cols={1, 2},
+        mono_cols={1},
     )
 
-    doc.add_heading("11. Sources", 1)
+    doc.add_heading("10. Sources", 1)
     bullets = [
         "AMP108 Director ↔ amp UDP log (C4-AMP108-1B Scripts, July 2024), including annotated igain / eq / psave.",
-        "Live GET/SET on C4-16AMP3-B 192.168.68.93 and AVM-16S1-B 192.168.68.80 (August 2026).",
-        "Composer Pro Advanced Properties (amp EQ, switch volume/unity gain).",
+        "Live GET/SET on C4-16AMP3-B 192.168.68.93 (August 2026).",
+        "Composer Pro Advanced Properties (amp EQ).",
         "Community Home Assistant UDP amp integrations (framing, chvol +155, chvolmax caveat).",
     ]
     for item in bullets:

@@ -4,6 +4,44 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 
 HACS shows the GitHub **release tag** (not a git commit hash). Each published version is a GitHub release named `v1.0.0`, `v1.0.1`, and so on.
 
+## [2.0.0]
+
+### Breaking
+
+- The Control4 audio switch (C4-16ZAMSV3-B / AVM-16S1-B, `c4.asw`) is no longer supported. The integration controls amps only. An existing switch entry stops loading with a message asking you to delete it; amp entries, entity IDs, and unique IDs are unchanged
+- Amp entries lose the old *Matrix switch* / *Amp input = switch output* settings automatically. An amp that was linked to a switch now lists only its own named inputs
+- Discovery skips the switch, and setup rejects a device that does not answer as an amp
+- The unused 16-zone profile is removed. No Control4 amp with 16 zones is known; the 16 in C4-16AMP3-B is channels (8 stereo zones)
+- A command the amp rejects (`n01` / `e00`) is now an error instead of being shown as done
+
+### Added
+
+- C4-8AMP1-B (8 channels, 4 zones, 4 inputs)
+- `c4_audio_external_change` event when a zone changes and Home Assistant did not ask for it
+- Zones turn on with their last source (option), and each zone can have its own turn-on volume
+- Balance and input level controls (option, off by default, experimental). Each change is read back
+- **Reconfigure** for a new IP address or port, and a confirm step with a readable name for discovered amps
+- Services accept a device. `host` still works
+
+### Changed
+
+- The amp is polled every 5 seconds while a zone is on (option). Firmware and bass/treble keep the normal interval
+- Volume is sent at most once per 250 ms per zone, always ending on the latest value
+- Source, bass, and treble are configuration entities in their zone's room. A room you set yourself is kept
+- The UDP activity log attribute is no longer recorded
+- The C4-16AMP3-B no longer gets `c4.amp.digi`, which it rejects. On 4-zone amps a missing answer to it is ignored
+
+### Fixed
+
+- One lost UDP reply no longer makes every zone unavailable. Reads are tried three times, and three polls in a row must fail
+- Commands are tried twice. A repeat never lands after a newer command
+- All on / All off continue past a zone that fails, and to the next amp
+- A zone routed to an unnamed input shows that input instead of Off
+- A network error at startup is retried instead of failing for good
+- Clearing a zone or input name in Configure works, and a cleared zone's entities are removed
+- Choosing a source on a 4-zone amp that is off wakes it first
+- Diagnostics work while the amp is not loaded, and hide the MAC address and IP
+
 ## [1.0.13]
 
 - Keep the regular poll on schedule. Status frames from the chassis no longer postpone it, so firmware, bass/treble and availability stay current even while a keypad or volume ramp is sending updates

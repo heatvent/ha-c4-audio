@@ -6,9 +6,7 @@ Packet shape captured from a C4-AMP108-1B (port 8750):
     0re76c v01
     0t0040 sa c4.amp.mute 02 00
 
-The C4-16AMP3-B uses the same `c4.amp.*` names with more zone slots.
-The AVM-16S1-B / C4-16ZAMSV3-B audio switch uses `c4.asw.*` (not `c4.amp`).
-Switch volume is percent as hex (`64` = 100 = unity), not percent+155.
+The C4-8AMP1-B and C4-16AMP3-B use the same `c4.amp.*` names, with 4 and 8 zone slots.
 """
 
 from __future__ import annotations
@@ -67,6 +65,11 @@ def hex_to_signed_gain(token: str) -> int:
     return max(-12, min(12, raw))
 
 
+def hex_to_signed(token: str) -> int:
+    raw = from_hex_byte(token)
+    return raw - 256 if raw >= 128 else raw
+
+
 def build_frame(prefix: str, sequence: int, body: str) -> bytes:
     seq = sequence & 0xFFFF
     payload = f"{prefix}{seq:04x} {body.strip()}\r\n"
@@ -104,19 +107,8 @@ def split_user_command(text: str) -> tuple[str, str]:
         "c4.amp.abss",
         "c4.amp.atrb",
         "c4.amp.abal",
-        "c4.asw.ain",
-        "c4.asw.avol",
-        "c4.asw.amut",
-        "c4.asw.abss",
-        "c4.asw.atrb",
-        "c4.asw.abal",
     }
-    prefix = (
-        "0g"
-        if stripped in get_bodies
-        or stripped.startswith(("c4.amp.digi", "c4.asw.ain", "c4.asw.avol", "c4.asw.amut"))
-        else "0s"
-    )
+    prefix = "0g" if stripped in get_bodies or stripped.startswith("c4.amp.digi") else "0s"
     if " " not in stripped and stripped.startswith("c4."):
         prefix = "0g"
     return prefix, stripped
@@ -193,13 +185,10 @@ def parse_hex_list(tokens: list[str]) -> list[int | None]:
     return values
 
 
-class DeviceCommands:
-    """Builders for c4.amp.* (amplifiers) or c4.asw.* (audio switch)."""
+class AmpCommands:
+    """Builders for c4.amp.* commands."""
 
-    def __init__(self, namespace: str = "c4.amp", volume_set: str = "chvol", volume_mode: str = "offset") -> None:
-        self.ns = namespace
-        self.volume_set = volume_set
-        self.volume_mode = volume_mode
+    ns = "c4.amp"
 
     def get_firmware(self) -> tuple[str, str]:
         return CMD_PREFIX_GET, "c4.sy.fwv"
@@ -241,18 +230,24 @@ class DeviceCommands:
         return CMD_PREFIX_SET, f"{self.ns}.mute {to_hex_byte(zone)} {to_hex_byte(1 if muted else 0)}"
 
     def encode_volume(self, percent: float) -> str:
-        pct = max(0, min(100, int(round(percent))))
-        if self.volume_mode == "percent_hex":
-            return to_hex_byte(pct)
-        return volume_percent_to_hex(pct)
+        return volume_percent_to_hex(percent)
 
     def decode_volume(self, token: str) -> int:
-        if self.volume_mode == "percent_hex":
-            return max(0, min(100, from_hex_byte(token)))
         return volume_hex_to_percent(token)
 
     def set_volume(self, zone: int, percent: float) -> tuple[str, str]:
-        return CMD_PREFIX_SET, f"{self.ns}.{self.volume_set} {to_hex_byte(zone)} {self.encode_volume(percent)}"
+        return CMD_PREFIX_SET, f"{self.ns}.chvol {to_hex_byte(zone)} {self.encode_volume(percent)}"
+
+    def set_balance(self, zone: int, value: int) -> tuple[str, str]:
+        """Confirmed on the 16AMP3 (`bal 08 01`). Read back after sending on other models."""
+        return CMD_PREFIX_SET, f"{self.ns}.bal {to_hex_byte(zone)} {to_hex_byte(value)}"
+
+    def get_input_gain(self, source: int) -> tuple[str, str]:
+        return CMD_PREFIX_GET, f"{self.ns}.igain {to_hex_byte(source)}"
+
+    def set_input_gain(self, source: int, db: int) -> tuple[str, str]:
+        """Source leveling. Captured on AMP108, confirmed on the 16AMP3 (`igain 01 ff` = -1 dB)."""
+        return CMD_PREFIX_SET, f"{self.ns}.igain {to_hex_byte(source)} {to_hex_byte(db)}"
 
     def get_volume_limits(self) -> tuple[str, str]:
         return CMD_PREFIX_GET, f"{self.ns}.vlim"
@@ -266,13 +261,3 @@ class DeviceCommands:
 
     def set_treble(self, zone: int, db: int) -> tuple[str, str]:
         return CMD_PREFIX_SET, f"{self.ns}.trebgain {to_hex_byte(zone)} {signed_gain_to_hex(db)}"
-
-
-# Back-compat name used by unit tests.
-class AmpCommands(DeviceCommands):
-    def __init__(self) -> None:
-        super().__init__("c4.amp", "chvol", "offset")
-
-    @staticmethod
-    def set_output(zone: int, source: int) -> tuple[str, str]:
-        return DeviceCommands("c4.amp").set_output(zone, source)

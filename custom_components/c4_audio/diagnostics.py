@@ -7,26 +7,32 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_SWITCH_ENTRY_ID
+from .const import CONF_IDENT
 from .coordinator import C4AudioCoordinator
 
-TO_REDACT = {CONF_HOST}
+# The identity string contains the chassis MAC address.
+TO_REDACT = {CONF_HOST, CONF_IDENT, "unique_id"}
 
 
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict:
-    coordinator: C4AudioCoordinator = entry.runtime_data
+    result: dict = {"entry": async_redact_data(entry.as_dict(), TO_REDACT)}
+    coordinator = getattr(entry, "runtime_data", None)
+    if not isinstance(coordinator, C4AudioCoordinator):
+        return result
     return {
-        "entry": async_redact_data(entry.as_dict(), TO_REDACT),
+        **result,
         "model": coordinator.model_id,
         "firmware": coordinator.state.firmware,
         "available": coordinator.state.available,
-        "switch_entry_id": coordinator.entry.options.get(
-            CONF_SWITCH_ENTRY_ID, coordinator.entry.data.get(CONF_SWITCH_ENTRY_ID)
-        ),
-        "switch_feeds": coordinator.switch_feeds,
-        "udp_activity": coordinator.client.activity_lines,
+        "poll_interval": coordinator.update_interval.total_seconds()
+        if coordinator.update_interval
+        else None,
+        "udp_activity": [
+            line.replace(coordinator.host, "**REDACTED**")
+            for line in coordinator.client.activity_lines
+        ],
         "zones": {
             str(index): {
                 "name": coordinator.zone_names[index - 1],

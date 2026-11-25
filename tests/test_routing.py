@@ -3,17 +3,15 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "c4_audio"))
 
 from routing import (
-    KIND_LOCAL,
-    KIND_SWITCH,
     clamp_volume,
-    displayed_amp_source,
+    displayed_source,
     enabled_indexes,
     ha_volume_to_percent,
-    merged_source_list,
-    parse_feeds,
     parse_zone_map,
     resolve_source_choice,
     split_names,
@@ -65,37 +63,27 @@ def test_empty_zone_name_is_skipped():
     assert mapped[3]["name"] == ""
 
 
-def test_parse_feeds_default_and_lines():
-    assert parse_feeds("") == {1: 1}
-    assert parse_feeds("1=1\n2=3") == {1: 1, 2: 3}
+def test_zone_map_reads_turn_on_volume():
+    mapped = parse_zone_map({"1": {"name": "a", "on_volume": 25}, "2": {"name": "b"}, "3": {"on_volume": "x"}}, 3)
+    assert [mapped[n]["on_volume"] for n in (1, 2, 3)] == [25, None, None]
 
 
-def test_select_wiim_goes_through_switch():
-    amp = ["Switch feed", "Unused", "-", "-", "-", "-", "-", "-"]
-    switch = ["EA-5", "-", "Retro Hi-Fi", "WiiM Pro"] + ["Input 5"] * 12
-    kind, amp_in, sw_out, sw_in = resolve_source_choice(
-        "WiiM Pro", amp, switch, {1: 1}
-    )
-    assert kind == KIND_SWITCH
-    assert amp_in == 1
-    assert sw_out == 1
-    assert sw_in == 4
+def test_select_source_maps_to_input():
+    names = ["WiiM Pro", "-", "Tuner", "-", "-", "-", "-", "-"]
+    assert resolve_source_choice("WiiM Pro", names) == 1
+    assert resolve_source_choice("Tuner", names) == 3
 
 
-def test_select_local_amp_input():
-    amp = ["Switch feed", "Tuner"]
-    kind, amp_in, sw_out, sw_in = resolve_source_choice("Tuner", amp, ["WiiM Pro"], {1: 1})
-    assert kind == KIND_LOCAL
-    assert amp_in == 2
-    assert sw_out is None
+def test_select_unknown_or_skipped_source_is_rejected():
+    assert resolve_source_choice("Input 2", ["WiiM Pro", "-"]) == 2  # shown while routed there
+    for name in ("Pandora", "-", "Input 9"):
+        with pytest.raises(ValueError):
+            resolve_source_choice(name, ["WiiM Pro", "-"])
 
 
-def test_merged_list_hides_switch_feed_jack():
-    amp = ["Switch bus", "Tuner"]
-    switch = ["WiiM Pro", "Pandora"]
-    assert merged_source_list(amp, switch, {1: 1}) == ["WiiM Pro", "Pandora", "Tuner"]
-
-
-def test_displayed_source_follows_switch():
-    name = displayed_amp_source(1, ["Switch bus"], {1: 1}, 4, ["A", "B", "C", "WiiM Pro"])
-    assert name == "WiiM Pro"
+def test_displayed_source():
+    names = ["WiiM Pro", "-"]
+    assert displayed_source(0, names) is None
+    assert displayed_source(1, names) == "WiiM Pro"
+    assert displayed_source(2, names) == "Input 2"
+    assert displayed_source(5, names) == "Input 5"

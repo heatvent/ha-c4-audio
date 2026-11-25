@@ -3,21 +3,27 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
-from homeassistant.const import CONF_HOST
+from homeassistant.const import ATTR_DEVICE_ID, CONF_HOST
 from homeassistant.core import HomeAssistant, ServiceCall, callback
-from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
+from homeassistant.exceptions import (
+    ConfigEntryError,
+    ConfigEntryNotReady,
+    HomeAssistantError,
+    ServiceValidationError,
+)
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.typing import ConfigType
-from homeassistant.helpers.update_coordinator import UpdateFailed
 
-from .const import CONF_IDENT, DOMAIN, MODELS, PLATFORMS
-from .coordinator import C4AudioCoordinator
-from .entity_ids import migrated_unique_id, stable_instance_id
+from .const import CONF_IDENT, CONF_MODEL, DOMAIN, MODELS, PLATFORMS, REMOVED_OPTIONS
+from .coordinator import C4AudioCoordinator, source_store
+from .entity_ids import migrated_unique_id, stable_instance_id, unused_suffix
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,25 +50,59 @@ def _coordinators(hass: HomeAssistant) -> list[C4AudioCoordinator]:
     ]
 
 
-def _match(hass: HomeAssistant, host: str | None, *, amps_only: bool = False) -> list[C4AudioCoordinator]:
+def _targets(hass: HomeAssistant, call: ServiceCall) -> list[C4AudioCoordinator]:
+    """Chassis picked by device or host. Every loaded chassis when neither is given."""
     items = _coordinators(hass)
-    if host:
-        items = [item for item in items if item.host == host]
-    elif amps_only:
-        items = [item for item in items if not item.is_matrix]
-    return items
-
-
-def _one_device(hass: HomeAssistant, host: str | None, service: str) -> C4AudioCoordinator:
-    """One chassis. host is required when more than one entry is loaded."""
-    matched = _match(hass, host)
+    host = call.data.get(CONF_HOST)
+    device_ids = call.data.get(ATTR_DEVICE_ID)
+    if not host and not device_ids:
+        return items
+    registry = dr.async_get(hass)
+    wanted = set(device_ids or [])
+    matched = [
+        item
+        for item in items
+        if (host and item.host == host)
+        or any(
+            device.id in wanted
+            for device in dr.async_entries_for_config_entry(registry, item.entry.entry_id)
+        )
+    ]
     if not matched:
-        raise HomeAssistantError(f"No Control4 Audio device matched for {service}")
-    if not host and len(matched) > 1:
-        raise HomeAssistantError(
-            f"{service} needs host when more than one Control4 Audio chassis is configured"
+        raise ServiceValidationError(f"No loaded Control4 Audio amp matches {call.service}")
+    return matched
+
+
+def _one_target(hass: HomeAssistant, call: ServiceCall) -> C4AudioCoordinator:
+    """One chassis. A device (or host) is required when more than one entry is loaded."""
+    matched = _targets(hass, call)
+    if not matched:
+        raise ServiceValidationError(f"No Control4 Audio amp is loaded for {call.service}")
+    if len(matched) > 1:
+        raise ServiceValidationError(
+            f"{call.service} needs one device when more than one Control4 amp is configured"
         )
     return matched[0]
+
+
+async def _run_on_all(
+    hass: HomeAssistant,
+    call: ServiceCall,
+    action: Callable[[C4AudioCoordinator], Awaitable[None]],
+) -> None:
+    """Run on every target. One amp failing does not stop the next."""
+    matched = _targets(hass, call)
+    if not matched:
+        _LOGGER.error("No Control4 Audio amp is loaded for %s", call.service)
+        return
+    errors: list[str] = []
+    for coordinator in matched:
+        try:
+            await action(coordinator)
+        except HomeAssistantError as err:
+            errors.append(f"{coordinator.entry.title}: {err}")
+    if errors:
+        raise HomeAssistantError("; ".join(errors))
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -71,18 +111,38 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+async def async_migrate_entry(hass: HomeAssistant, entry: C4AudioConfigEntry) -> bool:
+    """Drop the audio switch link from amp entries made by 1.0.13 and earlier."""
+    if entry.version > 1:
+        return False
+    if entry.minor_version < 2:
+        hass.config_entries.async_update_entry(
+            entry,
+            data={key: val for key, val in entry.data.items() if key not in REMOVED_OPTIONS},
+            options={key: val for key, val in entry.options.items() if key not in REMOVED_OPTIONS},
+            minor_version=2,
+        )
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: C4AudioConfigEntry) -> bool:
+    if entry.data.get(CONF_MODEL) not in MODELS:
+        raise ConfigEntryError(
+            f"{entry.title} is not a supported amplifier. The Control4 audio switch and the "
+            "16-zone profile are no longer supported; delete this entry."
+        )
     coordinator = C4AudioCoordinator(hass, entry)
-    await coordinator.async_start()
     try:
-        await coordinator.async_config_entry_first_refresh()
-    except UpdateFailed as err:
+        await coordinator.async_start()
+    except OSError as err:
         await coordinator.async_shutdown()
-        raise ConfigEntryNotReady(str(err)) from err
+        raise ConfigEntryNotReady(f"Could not reach {coordinator.host}: {err}") from err
+    await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     await _async_migrate_entity_unique_ids(hass, entry)
+    _remove_unused_entities(hass, entry, coordinator)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
@@ -120,6 +180,30 @@ async def _async_migrate_entity_unique_ids(hass: HomeAssistant, entry: ConfigEnt
     await er.async_migrate_entries(hass, entry.entry_id, _migrator)
 
 
+@callback
+def _remove_unused_entities(
+    hass: HomeAssistant, entry: ConfigEntry, coordinator: C4AudioCoordinator
+) -> None:
+    """Remove entities of zones whose name was cleared, and of switched-off experimental controls."""
+    if not coordinator.enabled_zones:
+        return
+    registry = er.async_get(hass)
+    prefix = f"{stable_instance_id(entry)}_"
+    inputs = coordinator.enabled_inputs if coordinator.experimental_enabled else []
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if entity.unique_id.startswith(prefix) and unused_suffix(
+            entity.unique_id[len(prefix) :],
+            zones=coordinator.enabled_zones,
+            inputs=inputs,
+            balance=coordinator.experimental_enabled,
+        ):
+            registry.async_remove(entity.entity_id)
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    await source_store(hass, entry.entry_id).async_remove()
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: C4AudioConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
@@ -134,33 +218,27 @@ def _register_services(hass: HomeAssistant) -> None:
 
     async def handle_send_command(call: ServiceCall) -> None:
         command = call.data[ATTR_COMMAND]
-        coordinator = _one_device(hass, call.data.get(CONF_HOST), SERVICE_SEND_COMMAND)
+        coordinator = _one_target(hass, call)
         reply = await coordinator.async_send_raw(command)
         if reply is None:
             raise HomeAssistantError(f"No reply from {coordinator.host} for {command}")
         _LOGGER.info("Raw command %s → %s", command, reply)
 
     async def handle_set_route(call: ServiceCall) -> None:
-        coordinator = _one_device(hass, call.data.get(CONF_HOST), SERVICE_SET_ROUTE)
+        coordinator = _one_target(hass, call)
         await coordinator.async_route_output(int(call.data[ATTR_OUTPUT]), int(call.data[ATTR_INPUT]))
         await coordinator.async_request_refresh()
 
     async def handle_turn_off_all(call: ServiceCall) -> None:
-        matched = _match(hass, call.data.get(CONF_HOST), amps_only=True)
-        if not matched:
-            _LOGGER.error("No Control4 Audio device matched for turn_off_all")
-            return
-        for coordinator in matched:
-            await coordinator.async_turn_off_all()
+        await _run_on_all(hass, call, lambda item: item.async_turn_off_all())
 
     async def handle_turn_on_all(call: ServiceCall) -> None:
-        matched = _match(hass, call.data.get(CONF_HOST), amps_only=True)
-        if not matched:
-            _LOGGER.error("No Control4 Audio device matched for turn_on_all")
-            return
-        for coordinator in matched:
-            await coordinator.async_turn_on_all()
+        await _run_on_all(hass, call, lambda item: item.async_turn_on_all())
 
+    target = {
+        vol.Optional(CONF_HOST): cv.string,
+        vol.Optional(ATTR_DEVICE_ID): vol.All(cv.ensure_list, [cv.string]),
+    }
     hass.services.async_register(
         DOMAIN,
         SERVICE_SEND_COMMAND,
@@ -168,7 +246,7 @@ def _register_services(hass: HomeAssistant) -> None:
         schema=vol.Schema(
             {
                 vol.Required(ATTR_COMMAND): cv.string,
-                vol.Optional(CONF_HOST): cv.string,
+                **target,
             }
         ),
     )
@@ -180,7 +258,7 @@ def _register_services(hass: HomeAssistant) -> None:
             {
                 vol.Required(ATTR_OUTPUT): vol.Coerce(int),
                 vol.Required(ATTR_INPUT): vol.Coerce(int),
-                vol.Optional(CONF_HOST): cv.string,
+                **target,
             }
         ),
     )
@@ -188,13 +266,13 @@ def _register_services(hass: HomeAssistant) -> None:
         DOMAIN,
         SERVICE_TURN_OFF_ALL,
         handle_turn_off_all,
-        schema=vol.Schema({vol.Optional(CONF_HOST): cv.string}),
+        schema=vol.Schema(target),
     )
     hass.services.async_register(
         DOMAIN,
         SERVICE_TURN_ON_ALL,
         handle_turn_on_all,
-        schema=vol.Schema({vol.Optional(CONF_HOST): cv.string}),
+        schema=vol.Schema(target),
     )
 
 

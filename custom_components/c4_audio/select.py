@@ -1,16 +1,17 @@
-"""Source picker on the amp/switch device (dropdown on the device page)."""
+"""Source picker on the amp device (dropdown on the device page)."""
 
 from __future__ import annotations
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import device_info_for
-from .const import SKIP_NAME
 from .coordinator import C4AudioCoordinator
+from .entity import adopt_zone_area
 from .entity_ids import entity_unique_id
 
 SOURCE_OFF = "Off"
@@ -29,42 +30,34 @@ class C4SourceSelect(CoordinatorEntity[C4AudioCoordinator], SelectEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "source"
     _attr_icon = "mdi:import"
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, coordinator: C4AudioCoordinator, zone: int) -> None:
         super().__init__(coordinator)
         self._zone = zone
-        kind = "output" if coordinator.is_matrix else "zone"
-        self._attr_unique_id = entity_unique_id(coordinator.entry, f"{kind}_{zone}_source")
+        self._attr_unique_id = entity_unique_id(coordinator.entry, f"zone_{zone}_source")
         self._attr_device_info = device_info_for(coordinator)
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
-        switch = self.coordinator.linked_switch()
-        if switch is not None:
-            self.async_on_remove(switch.async_add_listener(self._handle_switch_update))
-
-    @callback
-    def _handle_switch_update(self) -> None:
-        self.async_write_ha_state()
+        adopt_zone_area(self.hass, self.coordinator, self.entity_id, self._zone)
 
     @property
     def name(self) -> str:
-        jack = self.coordinator.zone_names[self._zone - 1]
-        label = "input" if self.coordinator.is_matrix else "source"
-        return f"{jack} {label}"
+        return f"{self.coordinator.zone_names[self._zone - 1]} source"
 
     @property
     def options(self) -> list[str]:
-        return [SOURCE_OFF, *self.coordinator.media_source_list()]
+        names = self.coordinator.media_source_list()
+        current = self.coordinator.media_source_name(self._zone)
+        if current and current not in names:
+            # Control4 can route a zone to an input that has no name here.
+            names = [*names, current]
+        return [SOURCE_OFF, *names]
 
     @property
-    def current_option(self) -> str | None:
-        name = self.coordinator.media_source_name(self._zone)
-        if not name or name == SKIP_NAME:
-            return SOURCE_OFF
-        if name in self.options:
-            return name
-        return SOURCE_OFF
+    def current_option(self) -> str:
+        return self.coordinator.media_source_name(self._zone) or SOURCE_OFF
 
     async def async_select_option(self, option: str) -> None:
         if option == SOURCE_OFF:

@@ -1,4 +1,4 @@
-"""UDP relay between Control4 Director and an amp or 16x16 switch.
+"""UDP relay between Control4 Director and an amp.
 
 Same pattern as your old intermediary: Director is pointed at this PC's IP.
 This process binds UDP 8750, forwards to the real device, and returns replies
@@ -6,7 +6,7 @@ to Director. Everything is logged so you can annotate what you tapped in Navigat
 
 Example:
 
-    python tools/c4_relay.py --bind 192.168.2.185 --device 192.168.2.200 --controller 192.168.2.60 --log logs/switch.txt
+    python tools/c4_relay.py --bind 192.168.2.185 --device 192.168.2.200 --controller 192.168.2.60 --log logs/amp.txt
 
 While it runs, type a short note and press Enter after each Navigator action
 (for example: "kitchen to input 3"). Notes are written into the log.
@@ -35,7 +35,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Control4 UDP 8750 intermediary logger")
     parser.add_argument("--bind", required=True, help="This PC's LAN IP (what Director will talk to)")
     parser.add_argument("--bind-port", type=int, default=8750)
-    parser.add_argument("--device", required=True, help="Real amp or switch IP")
+    parser.add_argument("--device", required=True, help="Real amp IP")
     parser.add_argument("--device-port", type=int, default=8750)
     parser.add_argument("--controller", default="", help="Director IP. If omitted, any non-device sender is treated as Director")
     parser.add_argument("--log", default="", help="Optional log file path")

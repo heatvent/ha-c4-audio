@@ -42,7 +42,7 @@ def run_one(host: str, port: int, prefix: str, seq: int, body: str, timeout: flo
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Probe a Control4 amp or matrix switch on UDP 8750")
+    parser = argparse.ArgumentParser(description="Probe a Control4 amp on UDP 8750")
     parser.add_argument("--host", required=True, help="Device IP")
     parser.add_argument("--port", type=int, default=8750)
     parser.add_argument("--timeout", type=float, default=1.5)

@@ -299,7 +299,7 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
         decoded = self.cmds.decode_volume(f"{value:02x}")
         last = self._last_commanded_volume.get(zone)
         if decoded == 1 and last is not None and last[1] == 0:
-            # The C4-8AMP1-B stores 0% as 1%.
+            # The amp stores 0% as 1%.
             return 0
         return decoded
 
@@ -320,6 +320,10 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
         self.state.zones[zone].volume = percent
         self._remember_volume(zone, percent)
 
+    async def _async_mute(self, zone: int) -> None:
+        await self._async_require_send(self.cmds.set_mute(zone, True))
+        self.state.zones[zone].muted = True
+
     async def _async_unmute(self, zone: int) -> None:
         await self._async_require_send(self.cmds.set_mute(zone, False))
         self.state.zones[zone].muted = False
@@ -328,6 +332,8 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
         """Route while muted, set the volume, then unmute."""
         if wake:
             await self._async_wake()
+        # A zone can be off but not muted. Routed like that, it plays at its old volume.
+        await self._async_mute(zone)
         await self.async_route_output(zone, source, unmute=False)
         await self._async_send_volume(zone, volume)
         await self._async_unmute(zone)
@@ -455,8 +461,12 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
                 if target is None or not self.zone_is_on(zone):
                     return  # Turned off meanwhile.
                 await self._async_send_volume(zone, target)
-                if target > 0 and self.state.zones[zone].muted:
-                    await self._async_unmute(zone)
+                if self.state.zones[zone].muted:
+                    # The amp unmutes a zone when its volume is set. Say which one we want.
+                    if target > 0:
+                        await self._async_unmute(zone)
+                    else:
+                        await self._async_mute(zone)
                 self.async_set_updated_data(self.state)
 
     async def async_adjust_volume(self, zone: int, delta: int) -> None:
@@ -489,7 +499,12 @@ class C4AudioCoordinator(DataUpdateCoordinator[DeviceState]):
     async def async_set_balance(self, zone: int, value: int) -> None:
         """Experimental. Read back, because it is not confirmed on every model."""
         self._check_output(zone)
-        await self._async_require_send(self.cmds.set_balance(zone, value))
+        with self._own_change(zone):
+            muted = self.state.zones[zone].muted
+            await self._async_require_send(self.cmds.set_balance(zone, value))
+            if muted:
+                # The amp unmutes a zone when its balance is set.
+                await self._async_mute(zone)
         await self._async_poll_list(self.cmds.get_balance(), self._apply_balance, required=False)
         self.async_set_updated_data(self.state)
         if self.state.zones[zone].balance != value:

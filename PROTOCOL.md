@@ -142,6 +142,14 @@ Both descriptors limit volume steps to one per 250 ms and list balance and input
 
 ## C4-16AMP3-B
 
+Both amps (`03.24.45` and `03.26.52`) behave the same in these cases:
+
+- `chvol` and `bal` **unmute** the zone, also when it is off. `bassgain`, `trebgain`, `out`, `igain`, and `psave` do not
+- 0% (`9b`) is stored as 1% (`9c`)
+- `igain` keeps positive values at `00`
+- `bal` accepts −10…+10; anything else answers `v01` and changes nothing
+- An input or zone that does not exist answers `v01` and changes nothing
+
 Checked on firmware `03.26.52`:
 
 | Command | Reply |

@@ -40,7 +40,7 @@ Off zones show the turn-on volume. Volume up/down starts from that level and tur
 
 ### Polling and activity
 
-Routes (`ain`), volume, and mute are polled about every **15 seconds** (5–300 configurable), and every **5 seconds** while a zone is on (2–300 configurable). Firmware and bass/treble keep the normal interval. Commands are sent one at a time. A read is tried three times and a command twice; the chassis is marked unavailable only after three polls in a row fail. After a turn on/off or source change, that chassis is re-read. Unsolicited `0t` frames update state when the hardware sends them, except a stale volume frame right after a write.
+Routes (`ain`), volume, and mute are polled about every **15 seconds** (5–300 configurable), and every **5 seconds** while a zone is on (2–300 configurable). Firmware and bass/treble keep the normal interval. Commands are sent one at a time. Reads and commands are tried three times; the chassis is marked unavailable only after three polls in a row fail. After a turn on/off or source change, that chassis is re-read. Unsolicited `0t` frames update state when the hardware sends them, except a stale volume frame right after a write.
 
 The integration does not subscribe to the amp's status events (`c4.sy.sub`), so it cannot take them away from Control4. Changes made by Control4 show up at the next poll.
 
@@ -58,7 +58,7 @@ triggers:
 
 ### Experimental controls
 
-**Configure → Settings → Show balance and input level** adds a balance slider per zone and a level slider per named input. Balance is confirmed on the C4-8AMP1-B (-10 to +10) and for one step on the 16AMP3. Input level is confirmed on the C4-8AMP1-B (-6 to 0 dB; it has no boost) and for -1 dB on the 16AMP3. Each change is read back and an amp that ignores it reports an error.
+**Configure → Settings → Show balance and input level** adds a balance slider per zone and a level slider per named input. Both are confirmed on the C4-8AMP1-B and the C4-16AMP3-B: balance -10 to +10, input level -6 to 0 dB (the amps have no boost). Balance is handy for checking that left and right speakers are not swapped. Each change is read back and an amp that ignores it reports an error.
 
 A diagnostic **UDP activity** sensor logs SET commands, replies, and `0t` frames (not routine GET polls).
 

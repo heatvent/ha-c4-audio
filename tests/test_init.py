@@ -268,9 +268,10 @@ async def test_select_source_on_off_zone_sends_amp_commands_in_order(
     coordinator.client.async_send.return_value = ParsedPacket("reply", 1, "000", None, [], "")
     await coordinator.async_select_source(2, "Tuner")
     await hass.async_block_till_done()
-    sent = [call.args for call in coordinator.client.async_send.await_args_list][:5]
+    sent = [call.args for call in coordinator.client.async_send.await_args_list][:6]
     assert sent == [
         ("0s", "c4.amp.psave 00"),
+        ("0s", "c4.amp.mute 02 01"),
         ("0g", "c4.amp.digi 02"),
         ("0s", "c4.amp.out 02 02"),
         ("0s", "c4.amp.chvol 02 a5"),

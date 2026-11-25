@@ -32,7 +32,7 @@ REMOVED_OPTIONS = ("switch_entry_id", "switch_feeds")
 
 # Extra tries after a lost reply. Every GET, and every SET sent here, is safe to repeat.
 GET_RETRIES = 2
-SET_RETRIES = 1
+SET_RETRIES = 2
 # Polls in a row that must fail before the chassis is marked unavailable.
 MAX_FAILED_POLLS = 3
 # Zones in a row that must fail before All on / All off gives up on the chassis.
@@ -42,7 +42,7 @@ MAX_FAILED_ZONES = 2
 VOLUME_INTERVAL_S = 0.25
 
 BALANCE_LIMIT = 10
-INPUT_GAIN_LIMIT = 6  # lowest level is minus this; the highest is per model
+INPUT_GAIN_MIN = -6  # dB. Both amps keep a positive level at 0.
 
 # Serial-over-UDP framing used by C4 Ethernet audio hardware.
 CMD_PREFIX_SET = "0s"
@@ -67,7 +67,6 @@ MODELS = {
         "inputs": 8,
         "wake_power_save": False,
         "digital_inputs": False,
-        "input_gain_max": INPUT_GAIN_LIMIT,
     },
     MODEL_8AMP1: {
         "name": "C4-8AMP1-B (4-zone amp)",
@@ -76,8 +75,6 @@ MODELS = {
         "inputs": 4,
         "wake_power_save": True,
         "digital_inputs": True,
-        # Firmware 03.24.45 keeps a positive level at 0.
-        "input_gain_max": 0,
     },
     MODEL_AMP108: {
         "name": "C4-AMP108-1B (4-zone amp)",
@@ -86,6 +83,5 @@ MODELS = {
         "inputs": 8,
         "wake_power_save": True,
         "digital_inputs": True,
-        "input_gain_max": 0,
     },
 }

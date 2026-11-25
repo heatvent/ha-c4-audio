@@ -4,6 +4,15 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 
 HACS shows the GitHub **release tag** (not a git commit hash). Each published version is a GitHub release named `v1.0.0`, `v1.0.1`, and so on.
 
+## [2.0.2]
+
+Found by a burn-in of a C4-8AMP1-B and a C4-16AMP3-B.
+
+- Setting the balance of a muted zone, or its volume to 0%, keeps it muted (the amp unmutes a zone on both commands)
+- A zone is always muted before it is routed at turn-on, so one that was left unmuted cannot play at its old volume
+- Commands are tried three times, like reads. A C4-8AMP1-B went quiet for more than three seconds once
+- The input level slider stops at 0 dB on every amp; both amps ignore a higher level
+
 ## [2.0.1]
 
 Tested on a real C4-8AMP1-B (firmware 03.24.45): identification, wake, routing to all four inputs, mute, volume, bass, treble, balance, and input level.

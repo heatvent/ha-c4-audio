@@ -85,10 +85,12 @@ class FakeAmp:
                 self.mute[index - 1] = value
             elif name == "c4.amp.chvol":
                 self.vol[index - 1] = value - 155
+                self.mute[index - 1] = 0  # like the real amps
             elif name == "c4.amp.bal":
                 self.bal[index - 1] = value - 256 if value > 127 else value
+                self.mute[index - 1] = 0  # like the real amps
             elif name == "c4.amp.igain":
-                self.gain[index] = value - 256 if value > 127 else value
+                self.gain[index] = value - 256 if value > 127 else 0
         return ParsedPacket("reply", 1, "000", None, [], body)
 
 
@@ -501,7 +503,7 @@ async def test_balance_and_input_level(hass: HomeAssistant, amp: FakeAmp) -> Non
     with pytest.raises(HomeAssistantError, match="did not change"):
         await coordinator.async_set_balance(1, 4)
     with pytest.raises(HomeAssistantError, match="did not change"):
-        await coordinator.async_set_input_gain(1, 4)
+        await coordinator.async_set_input_gain(1, -4)
     assert coordinator.state.zones[1].balance == -3
     # Turning the option off removes them again, and nothing else.
     hass.config_entries.async_update_entry(entry, options={"experimental_controls": False})
@@ -711,8 +713,42 @@ async def test_zero_volume_stays_zero_when_the_amp_stores_one(hass: HomeAssistan
     assert coordinator.state.zones[1].volume == 1  # a real 1% is still 1%
 
 
-@pytest.mark.parametrize(("model", "highest"), [(MODEL_8AMP1, 0), (MODEL_AMP16, 6)])
-async def test_input_level_range(hass: HomeAssistant, amp: FakeAmp, model, highest) -> None:
+@pytest.mark.parametrize("model", [MODEL_8AMP1, MODEL_AMP16])
+async def test_input_level_range(hass: HomeAssistant, amp: FakeAmp, model) -> None:
     await setup(hass, model=model, options={"experimental_controls": True})
     state = hass.states.get(entity(hass, "number", "input_1_gain"))
-    assert (state.attributes["min"], state.attributes["max"]) == (-6, highest)
+    assert (state.attributes["min"], state.attributes["max"]) == (-6, 0)
+
+
+async def test_balance_keeps_a_muted_zone_muted(hass: HomeAssistant, amp: FakeAmp) -> None:
+    amp.out[0], amp.mute[0] = 1, 1
+    amp.out[1], amp.mute[1] = 1, 0
+    entry = await setup(hass, options={"experimental_controls": True})
+    for zone in (1, 2, 3):  # muted, playing, off
+        await entry.runtime_data.async_set_balance(zone, 5)
+    assert amp.bal[:3] == [5, 5, 5]
+    assert amp.mute[:3] == [1, 0, 1]
+
+
+async def test_zero_volume_keeps_a_muted_zone_muted(hass: HomeAssistant, amp: FakeAmp) -> None:
+    amp.out[0], amp.mute[0] = 1, 1
+    entry = await setup(hass)
+    await entry.runtime_data.async_set_volume(1, 0.0)
+    assert amp.mute[0] == 1
+    assert entry.runtime_data.state.zones[1].muted is True
+    await entry.runtime_data.async_set_volume(1, 0.2)
+    assert amp.mute[0] == 0
+
+
+@pytest.mark.parametrize("how", ["turn_on", "select_source"])
+async def test_zone_left_unmuted_is_muted_before_routing(hass: HomeAssistant, amp: FakeAmp, how) -> None:
+    amp.out[0], amp.mute[0], amp.vol[0] = 0, 0, 90
+    entry = await setup(hass)
+    amp.sent.clear()
+    if how == "turn_on":
+        await entry.runtime_data.async_turn_on(1)
+    else:
+        await entry.runtime_data.async_select_source(1, "WiiM Pro")
+    assert amp.sent[:3] == ["c4.amp.mute 01 01", "c4.amp.out 01 01", "c4.amp.chvol 01 a5"]
+    assert amp.mute[0] == 0
+    await hass.async_block_till_done()

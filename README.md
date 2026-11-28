@@ -196,3 +196,22 @@ Do **not** send `chvolmax` on zone off — 16AMP3 firmware snaps live volume to 
 ## Related
 
 For Music Assistant zone facades (decoder plays; amp zones are power/volume players), see [ha-amp-zone-player](https://github.com/heatvent/ha-amp-zone-player).
+
+---
+
+## Support
+
+- Repository: [github.com/heatvent/ha-c4-audio](https://github.com/heatvent/ha-c4-audio)
+- Issues: [github.com/heatvent/ha-c4-audio/issues](https://github.com/heatvent/ha-c4-audio/issues)
+
+## Credits
+
+Written by heatvent, developed with [Cursor](https://cursor.com) and [Claude Code](https://claude.com/claude-code). The protocol was worked out from captures of the amps, and compared with these public projects (see [PROTOCOL.md](PROTOCOL.md)):
+
+- [kmakar89/Home-Assistant---Control4](https://github.com/kmakar89/Home-Assistant---Control4)
+- [OtisPresley/control4-mediaplayer](https://github.com/OtisPresley/control4-mediaplayer)
+- [Home Assistant community: direct control of a Control4 amp](https://community.home-assistant.io/t/home-assistant-direct-control-of-control4-amp-and-tuner-no-plugin-needed/103497)
+
+## License
+
+[MIT](LICENSE). Unofficial: Snap One / Control4 did not make and does not support this integration. Control4 is a trademark of Snap One, used only to identify the amplifiers it controls.
